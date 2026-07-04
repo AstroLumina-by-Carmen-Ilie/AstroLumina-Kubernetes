@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: astrolumina-ingress-green
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+    variant: green
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  tls:
+    - hosts:
+        - astrolumina.ro
+        - api.astrolumina.ro
+      secretName: astrolumina-tls
+  rules:
+    - host: astrolumina.ro
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-green
+                port:
+                  number: 80
+    - host: api.astrolumina.ro
+      http:
+        paths:
+          - path: /astrology
+            pathType: Prefix
+            backend:
+              service:
+                name: astrology-api-green
+                port:
+                  number: 3031
+          - path: /booking
+            pathType: Prefix
+            backend:
+              service:
+                name: booking-api-green
+                port:
+                  number: 3033
+          - path: /payment
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-api-green
+                port:
+                  number: 3032

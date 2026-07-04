@@ -1,0 +1,87 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env
+  namespace: astrolumina-dev
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: config
+    environment: development
+data:
+  FRONTEND_TAG: "2.0.2"
+  ASTROLOGY_API_TAG: "2.0.1"
+  BOOKING_API_TAG: "2.0.1"
+  PAYMENT_API_TAG: "2.0.1"
+  NODE_ENV: "development"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-frontend
+  namespace: astrolumina-dev
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: frontend
+    environment: development
+data:
+  VITE_NODE_ENV: "development"
+  VITE_DEBUG_MODE: "false"
+  VITE_ASTROLOGICAL_API_URL: "http://astrology-api:3031"
+  VITE_PAYMENT_API_URL: "http://payment-api:3032"
+  VITE_BOOKING_API_URL: "http://booking-api:3033"
+  VITE_STRIPE_PK: "pk_test_51QsKuwI8IlTXEO0JOLZuYyz0e1Lmfk9fqDqX7hlUeVmsbYvbJhJrR2zEfY7pT32FSNNPnPTH4guXhZrGFu8ZHIiK00rLxK0Xec"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-astrology-api
+  namespace: astrolumina-dev
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: astrology-api
+    environment: development
+data:
+  NODE_ENV: "development"
+  PORT: "3031"
+  ASTROLOGER_API_URL: "https://astrologer.p.rapidapi.com"
+  ASTROLOGER_API_HOST: "astrologer.p.rapidapi.com"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-booking-api
+  namespace: astrolumina-dev
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: booking-api
+    environment: development
+data:
+  NODE_ENV: "development"
+  PORT: "3033"
+  CALCOM_BASE_URL: "https://api.cal.com"
+  R2_BASE_URL: "https://pub-3a468a81beab43daa28dba00d60409d6.r2.dev/pdfs"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-payment-api
+  namespace: astrolumina-dev
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: payment-api
+    environment: development
+data:
+  NODE_ENV: "development"
+  PORT: "3032"
+  STRIPE_API_VER: "2025-01-27.acacia"
+  STRIPE_SOARELE_STRALUCIREA_TA: "price_1TH6PII8IlTXEO0JwC26zZfX"
+  STRIPE_GHID_SATURN_IN_BERBEC: "price_1TGl35I8IlTXEO0Jnwifah9G"
+  STRIPE_ASTROGRAMA_NATALA_SI_KARMICA: "price_1TGl34I8IlTXEO0JOGCkYEkt"
+  STRIPE_ASTROGRAMA_RELATIONALA: "price_1TGl34I8IlTXEO0JOBcBwUk4"
+  STRIPE_ASTROGRAMA_PREVIZIONALA: "price_1TGl33I8IlTXEO0JbZk30It5"
+  STRIPE_EVENIMENT_CONSTELATII: "price_1TOwI2I8IlTXEO0J8JQAcgIv"

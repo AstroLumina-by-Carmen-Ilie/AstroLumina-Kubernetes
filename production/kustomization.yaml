@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: astrolumina-prod
+
+resources:
+  - 00-namespace.yaml
+  - 01-env-configmap.yaml
+  - 02-secrets.yaml
+  - 50-ingress-active.yaml
+  - 60-network-policy.yaml
+  - 70-hpa.yaml
+  - blue
+  - green
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: astrolumina

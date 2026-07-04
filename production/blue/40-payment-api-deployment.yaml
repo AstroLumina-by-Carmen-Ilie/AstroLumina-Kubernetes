@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api-blue
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/name: payment-api
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: payment-api
+    environment: production
+    variant: blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payment-api
+      app.kubernetes.io/component: payment-api
+      variant: blue
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: payment-api
+        app.kubernetes.io/part-of: astrolumina
+        app.kubernetes.io/component: payment-api
+        environment: production
+        variant: blue
+    spec:
+      containers:
+        - name: payment-api
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3032
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3032"
+            - name: STRIPE_API_VER
+              valueFrom:
+                configMapKeyRef:
+                  name: env-payment-api
+                  key: STRIPE_API_VER
+            - name: STRIPE_SOARELE_STRALUCIREA_TA
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: STRIPE_SOARELE_STRALUCIREA_TA
+            - name: STRIPE_GHID_SATURN_IN_BERBEC
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: STRIPE_GHID_SATURN_IN_BERBEC
+            - name: STRIPE_ASTROGRAMA_NATALA_SI_KARMICA
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: STRIPE_ASTROGRAMA_NATALA_SI_KARMICA
+            - name: STRIPE_ASTROGRAMA_RELATIONALA
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: STRIPE_ASTROGRAMA_RELATIONALA
+            - name: STRIPE_ASTROGRAMA_PREVIZIONALA
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: STRIPE_ASTROGRAMA_PREVIZIONALA
+            - name: STRIPE_EVENIMENT_CONSTELATII
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: STRIPE_EVENIMENT_CONSTELATII
+            - name: STRIPE_SK
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: STRIPE_SK
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: env-payment-api-secrets
+                  key: SENTRY_DSN
+          resources:
+            requests:
+              cpu: 125m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 2
+      restartPolicy: Always

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: astrolumina-prod
+  labels:
+    name: astrolumina-prod
+    environment: production
+    app.kubernetes.io/part-of: astrolumina

@@ -1,0 +1,70 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: config
+    environment: staging
+data:
+  NODE_ENV: "staging"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-frontend
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: frontend
+    environment: staging
+data:
+  VITE_NODE_ENV: "staging"
+  VITE_DEBUG_MODE: "true"
+  VITE_ASTROLOGICAL_API_URL: "http://astrology-api-active:3031"
+  VITE_PAYMENT_API_URL: "http://payment-api-active:3032"
+  VITE_BOOKING_API_URL: "http://booking-api-active:3033"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-astrology-api
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: astrology-api
+    environment: staging
+data:
+  ASTROLOGER_API_URL: "https://astrologer.p.rapidapi.com"
+  ASTROLOGER_API_HOST: "astrologer.p.rapidapi.com"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-booking-api
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: booking-api
+    environment: staging
+data:
+  CALCOM_BASE_URL: "https://api.cal.com"
+  R2_BASE_URL: "https://pub-3a468a81beab43daa28dba00d60409d6.r2.dev/pdfs"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-payment-api
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: payment-api
+    environment: staging
+data:
+  STRIPE_API_VER: "2025-01-27.acacia"

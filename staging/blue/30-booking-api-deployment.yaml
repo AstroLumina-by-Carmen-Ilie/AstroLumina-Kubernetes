@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-api-blue
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/name: booking-api
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: booking-api
+    environment: staging
+    variant: blue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: booking-api
+      app.kubernetes.io/component: booking-api
+      variant: blue
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: booking-api
+        app.kubernetes.io/part-of: astrolumina
+        app.kubernetes.io/component: booking-api
+        environment: staging
+        variant: blue
+    spec:
+      containers:
+        - name: booking-api
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3033
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "staging"
+            - name: PORT
+              value: "3033"
+            - name: CALCOM_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: env-booking-api
+                  key: CALCOM_BASE_URL
+            - name: R2_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: env-booking-api
+                  key: R2_BASE_URL
+            - name: CALCOM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: CALCOM_API_KEY
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: RESEND_API_KEY
+            - name: D1_ACCOUNT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: D1_ACCOUNT_ID
+            - name: D1_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: D1_API_TOKEN
+            - name: D1_DATABASE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: D1_DATABASE_ID
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: SENTRY_DSN
+          resources:
+            requests:
+              cpu: 125m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 2
+      restartPolicy: Always
