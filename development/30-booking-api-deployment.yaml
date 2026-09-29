@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: booking-api
   namespace: astrolumina-dev
+  # Let the Doppler operator restart the pods automatically when a synced secret changes.
+  annotations:
+    secrets.doppler.com/reload: "true"
   labels:
     app.kubernetes.io/name: booking-api
     app.kubernetes.io/part-of: astrolumina
@@ -35,17 +38,59 @@ spec:
             - name: http
               containerPort: 3033
               protocol: TCP
+          # Full variable set from src/config/env.ts (the app exits at startup
+          # if any required variable is missing; PORT alone is not read).
           env:
             - name: NODE_ENV
               valueFrom:
                 configMapKeyRef:
                   name: env
                   key: NODE_ENV
-            - name: PORT
+            - name: FRONTEND_SERVER_PORT
               valueFrom:
                 configMapKeyRef:
-                  name: env-booking-api
-                  key: PORT
+                  name: env
+                  key: FRONTEND_SERVER_PORT
+            - name: FRONTEND_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: FRONTEND_SERVER_DNS
+            - name: ASTROLOGY_API_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: ASTROLOGY_API_SERVER_PORT
+            - name: ASTROLOGY_API_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: ASTROLOGY_API_SERVER_DNS
+            - name: BOOKING_API_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: BOOKING_API_SERVER_PORT
+            - name: BOOKING_API_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: BOOKING_API_SERVER_DNS
+            - name: PAYMENT_API_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: PAYMENT_API_SERVER_PORT
+            - name: PAYMENT_API_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: PAYMENT_API_SERVER_DNS
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: CORS_ORIGINS
             - name: CALCOM_BASE_URL
               valueFrom:
                 configMapKeyRef:
@@ -81,11 +126,11 @@ spec:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: D1_DATABASE_ID
-            - name: SENTRY_DSN
+            - name: BOOKING_API_SENTRY_DSN
               valueFrom:
                 secretKeyRef:
                   name: env-booking-api-secrets
-                  key: SENTRY_DSN
+                  key: BOOKING_API_SENTRY_DSN
           resources:
             requests:
               cpu: 125m

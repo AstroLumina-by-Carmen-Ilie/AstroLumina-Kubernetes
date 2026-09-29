@@ -1,0 +1,113 @@
+---
+# Traefik middlewares mirroring traefik/dynamic/routes.yml from the Compose
+# production setup, plus the HTTP->HTTPS redirect and the dashboard basic auth.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: compress
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  compress: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  headers:
+    frameDeny: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "strict-origin-when-cross-origin"
+    customResponseHeaders:
+      X-Robots-Tag: "noindex, nofollow"
+---
+# Defined in routes.yml but attached to no router there either. Kept available
+# so it can be attached per-route later without touching the router manifest.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  rateLimit:
+    average: 100
+    burst: 50
+    period: 1s
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-astrology
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  stripPrefix:
+    prefixes:
+      - "/api/astrology"
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-payment
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  stripPrefix:
+    prefixes:
+      - "/api/payment"
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-booking
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  stripPrefix:
+    prefixes:
+      - "/api/booking"
+---
+# Mirrors the Compose production :80 router that redirects everything to :443.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: to-https
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+# Credentials for the Traefik dashboard (mirrors TRAEFIK_DASHBOARD_AUTH from
+# the Compose production .env). References the traefik-dashboard-auth Secret.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: dashboard-auth
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  basicAuth:
+    secret: traefik-dashboard-auth

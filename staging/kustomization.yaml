@@ -7,7 +7,10 @@ resources:
   - 00-namespace.yaml
   - 01-env-configmap.yaml
   - 02-secrets.yaml
-  - 50-ingress-active.yaml
+  - 03-doppler-secrets.yaml
+  - 51-middlewares.yaml
+  - 52-ingressroute.yaml
+  - 53-live-services.yaml
   - 60-network-policy.yaml
   - 70-hpa.yaml
   - blue

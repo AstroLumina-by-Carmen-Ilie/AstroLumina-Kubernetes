@@ -12,8 +12,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: frontend-blue
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 3
+  maxReplicas: 9
   metrics:
     - type: Resource
       resource:
@@ -35,8 +35,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: frontend-green
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 3
+  maxReplicas: 9
   metrics:
     - type: Resource
       resource:
@@ -58,8 +58,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: astrology-api-blue
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 3
+  maxReplicas: 9
   metrics:
     - type: Resource
       resource:
@@ -81,8 +81,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: astrology-api-green
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 3
+  maxReplicas: 9
   metrics:
     - type: Resource
       resource:
@@ -104,8 +104,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: booking-api-blue
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 3
+  maxReplicas: 9
   metrics:
     - type: Resource
       resource:
@@ -127,8 +127,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: booking-api-green
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 3
+  maxReplicas: 9
   metrics:
     - type: Resource
       resource:

@@ -1,0 +1,85 @@
+---
+# Traefik middlewares mirroring traefik/dynamic/routes.yml from the Compose
+# staging setup. Values are kept identical so behavior matches exactly.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: compress
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: staging
+spec:
+  compress: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: staging
+spec:
+  headers:
+    frameDeny: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "strict-origin-when-cross-origin"
+    customResponseHeaders:
+      X-Robots-Tag: "noindex, nofollow"
+---
+# Defined in routes.yml but attached to no router there either. Kept available
+# so it can be attached per-route later without touching the router manifest.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: staging
+spec:
+  rateLimit:
+    average: 100
+    burst: 50
+    period: 1s
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-astrology
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: staging
+spec:
+  stripPrefix:
+    prefixes:
+      - "/api/astrology"
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-payment
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: staging
+spec:
+  stripPrefix:
+    prefixes:
+      - "/api/payment"
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-booking
+  namespace: astrolumina-staging
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: staging
+spec:
+  stripPrefix:
+    prefixes:
+      - "/api/booking"

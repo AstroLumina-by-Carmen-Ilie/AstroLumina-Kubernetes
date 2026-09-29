@@ -12,7 +12,6 @@ resources:
   - 31-booking-api-service.yaml
   - 40-payment-api-deployment.yaml
   - 41-payment-api-service.yaml
-  - 50-ingress.yaml
 
 commonLabels:
   app.kubernetes.io/managed-by: kustomize

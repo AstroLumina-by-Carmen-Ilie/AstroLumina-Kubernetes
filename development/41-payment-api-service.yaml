@@ -9,11 +9,13 @@ metadata:
     app.kubernetes.io/component: payment-api
     environment: development
 spec:
-  type: ClusterIP
+  # NodePort so the laptop browser can call the API at <node-ip>:30302.
+  type: NodePort
   ports:
     - name: http
       port: 3032
       targetPort: http
+      nodePort: 30302
       protocol: TCP
   selector:
     app.kubernetes.io/name: payment-api

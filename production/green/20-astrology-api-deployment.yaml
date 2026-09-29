@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: astrology-api-green
   namespace: astrolumina-prod
+  # Let the Doppler operator restart the pods automatically when a synced secret changes.
+  annotations:
+    secrets.doppler.com/reload: "true"
   labels:
     app.kubernetes.io/name: astrology-api
     app.kubernetes.io/part-of: astrolumina
@@ -10,7 +13,8 @@ metadata:
     environment: production
     variant: green
 spec:
-  replicas: 2
+  # 3 replicas to mirror the Compose production green service.
+  replicas: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: astrology-api
@@ -38,11 +42,60 @@ spec:
             - name: http
               containerPort: 3031
               protocol: TCP
+          # Full variable set from src/config/env.ts: the app exits at startup
+          # if any required variable is missing, so every validated name must
+          # be wired here (PORT alone is not read by the app).
           env:
             - name: NODE_ENV
-              value: "production"
-            - name: PORT
-              value: "3031"
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: NODE_ENV
+            - name: FRONTEND_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: FRONTEND_SERVER_PORT
+            - name: FRONTEND_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: FRONTEND_SERVER_DNS
+            - name: ASTROLOGY_API_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: ASTROLOGY_API_SERVER_PORT
+            - name: ASTROLOGY_API_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: ASTROLOGY_API_SERVER_DNS
+            - name: BOOKING_API_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: BOOKING_API_SERVER_PORT
+            - name: BOOKING_API_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: BOOKING_API_SERVER_DNS
+            - name: PAYMENT_API_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: PAYMENT_API_SERVER_PORT
+            - name: PAYMENT_API_SERVER_DNS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: PAYMENT_API_SERVER_DNS
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: env
+                  key: CORS_ORIGINS
             - name: ASTROLOGER_API_URL
               valueFrom:
                 configMapKeyRef:
@@ -58,11 +111,11 @@ spec:
                 secretKeyRef:
                   name: env-astrology-api-secrets
                   key: ASTROLOGER_API_KEY
-            - name: SENTRY_DSN
+            - name: ASTROLOGY_API_SENTRY_DSN
               valueFrom:
                 secretKeyRef:
                   name: env-astrology-api-secrets
-                  key: SENTRY_DSN
+                  key: ASTROLOGY_API_SENTRY_DSN
           resources:
             requests:
               cpu: 125m

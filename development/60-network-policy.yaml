@@ -1,41 +1,65 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: astrolumina-network-policy
+  name: default-deny
   namespace: astrolumina-dev
   labels:
     app.kubernetes.io/part-of: astrolumina
     environment: development
 spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/part-of: astrolumina
+  podSelector: {}
   policyTypes:
     - Ingress
     - Egress
   ingress:
+    # Pod-to-pod traffic inside the namespace (health, service mesh, DNS via
+    # the node-local resolver is covered by the egress rule below).
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: astrolumina-dev
+        - podSelector: {}
       ports:
-        - protocol: TCP
-          port: 80
-        - protocol: TCP
-          port: 3031
-        - protocol: TCP
-          port: 3032
-        - protocol: TCP
-          port: 3033
+        - port: 80
+          protocol: TCP
+        - port: 3031
+          protocol: TCP
+        - port: 3032
+          protocol: TCP
+        - port: 3033
+          protocol: TCP
+    # Dev has no Traefik: NodePorts are reached directly from the LAN, so the
+    # app ports accept traffic from anywhere in this environment only.
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 3031
+          protocol: TCP
+        - port: 3032
+          protocol: TCP
+        - port: 3033
+          protocol: TCP
   egress:
+    - to:
+        - podSelector: {}
+    # CoreDNS (kube-system) for name resolution, public HTTP(S) for the
+    # third-party APIs (RapidAPI, Cal.com, Stripe, Sentry, Cloudflare).
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: astrolumina-dev
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -44,7 +68,7 @@ spec:
               - 172.16.0.0/12
               - 192.168.0.0/16
       ports:
-        - protocol: TCP
-          port: 443
-        - protocol: TCP
-          port: 80
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP

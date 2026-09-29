@@ -9,11 +9,13 @@ metadata:
     app.kubernetes.io/component: booking-api
     environment: development
 spec:
-  type: ClusterIP
+  # NodePort so the laptop browser can call the API at <node-ip>:30303.
+  type: NodePort
   ports:
     - name: http
       port: 3033
       targetPort: http
+      nodePort: 30303
       protocol: TCP
   selector:
     app.kubernetes.io/name: booking-api

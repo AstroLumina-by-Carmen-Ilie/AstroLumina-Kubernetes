@@ -1,4 +1,7 @@
 ---
+# Shared environment (mirrors the Docker Compose production .env in Doppler).
+# DNS names are the public host because Traefik terminates the single host
+# and the apps use these values for CORS origins and CSP headers.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,8 +13,20 @@ metadata:
     environment: production
 data:
   NODE_ENV: "production"
-
+  FRONTEND_SERVER_PORT: "443"
+  FRONTEND_SERVER_DNS: astrolumina.ro
+  ASTROLOGY_API_SERVER_PORT: "443"
+  ASTROLOGY_API_SERVER_DNS: astrolumina.ro
+  BOOKING_API_SERVER_PORT: "443"
+  BOOKING_API_SERVER_DNS: astrolumina.ro
+  PAYMENT_API_SERVER_PORT: "443"
+  PAYMENT_API_SERVER_DNS: astrolumina.ro
+  CORS_ORIGINS: https://astrolumina.ro
 ---
+# Frontend runtime config. The image entrypoint (docker-entrypoint.sh) injects
+# these Compose-style variables into public/env.js - VITE_* names are NOT read.
+# Production is HTTPS behind Traefik (entryPoint websecure, certResolver
+# letsencrypt, same as the Compose production Traefik static config).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,12 +37,11 @@ metadata:
     app.kubernetes.io/component: frontend
     environment: production
 data:
-  VITE_NODE_ENV: "production"
-  VITE_DEBUG_MODE: "false"
-  VITE_ASTROLOGICAL_API_URL: "http://astrology-api-active:3031"
-  VITE_PAYMENT_API_URL: "http://payment-api-active:3032"
-  VITE_BOOKING_API_URL: "http://booking-api-active:3033"
-
+  ASTROLOGICAL_API_URL: "https://astrolumina.ro/api/astrology"
+  PAYMENT_API_URL: "https://astrolumina.ro/api/payment"
+  BOOKING_API_URL: "https://astrolumina.ro/api/booking"
+  STRIPE_PK: "pk_live_REPLACE_WITH_PROD_PUBLISHABLE_KEY"
+  R2_BASE_URL: "https://pub-3a468a81beab43daa28dba00d60409d6.r2.dev/pdfs"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -41,7 +55,6 @@ metadata:
 data:
   ASTROLOGER_API_URL: "https://astrologer.p.rapidapi.com"
   ASTROLOGER_API_HOST: "astrologer.p.rapidapi.com"
-
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -55,7 +68,6 @@ metadata:
 data:
   CALCOM_BASE_URL: "https://api.cal.com"
   R2_BASE_URL: "https://pub-3a468a81beab43daa28dba00d60409d6.r2.dev/pdfs"
-
 ---
 apiVersion: v1
 kind: ConfigMap

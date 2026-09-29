@@ -1,0 +1,91 @@
+---
+# Single-host routing for production, mirroring the Compose routers: one host
+# (astrolumina.ro), /api/* prefixes stripped before the apps, HTTPS on
+# entryPoint websecure with the letsencrypt certResolver (same email, same
+# httpChallenge as the Compose production Traefik static config). Port 80 only
+# redirects to HTTPS. Traffic goes to the *-live Services; the blue-green
+# switch flips the 4 selectors in 53-live-services.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: astrolumina
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`astrolumina.ro`)
+      kind: Rule
+      middlewares:
+        - name: to-https
+      services:
+        - name: noop@internal
+          kind: TraefikService
+    - match: Host(`astrolumina.ro`) && PathPrefix(`/api/astrology`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+        - name: strip-astrology
+      services:
+        - name: astrology-api-live
+          port: 3031
+    - match: Host(`astrolumina.ro`) && PathPrefix(`/api/booking`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+        - name: strip-booking
+      services:
+        - name: booking-api-live
+          port: 3033
+    - match: Host(`astrolumina.ro`) && PathPrefix(`/api/payment`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+        - name: strip-payment
+      services:
+        - name: payment-api-live
+          port: 3032
+    - match: Host(`astrolumina.ro`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+      services:
+        - name: frontend-live
+          port: 80
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: astrolumina.ro
+---
+# Production dashboard (mirrors the Compose dashboard router with basic auth).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`dashboard.astrolumina.ro`)
+      kind: Rule
+      middlewares:
+        - name: dashboard-auth
+      services:
+        - name: api@internal
+          kind: TraefikService
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: dashboard.astrolumina.ro

@@ -9,11 +9,14 @@ metadata:
     app.kubernetes.io/component: frontend
     environment: development
 spec:
-  type: ClusterIP
+  # NodePort replaces the Compose port publishing: no Traefik in dev, the
+  # laptop browser reaches the frontend directly at <node-ip>:30080.
+  type: NodePort
   ports:
     - name: http
       port: 80
       targetPort: http
+      nodePort: 30080
       protocol: TCP
   selector:
     app.kubernetes.io/name: frontend
