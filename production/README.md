@@ -13,9 +13,10 @@ BEFORE the first `kubectl apply -k production/`.
 
 - Fresh RKE2 VMs: 1 control-plane + 2 workers, all `Ready`.
 - `kubectl` on your local machine plus the kubeconfig of the cluster.
-- In Doppler: project `astrolumina`, config `prd` with LIVE keys
-  (`sk_live_`, live price IDs, prod DSNs), plus the **service token** for
-  the `prd` config.
+- In Doppler: project `astrolumina`, config `prd` with LIVE values for
+  EVERY variable (shared vars, frontend/API URLs with the `astrolumina.ro`
+  host, `CORS_ORIGINS`, `sk_live_`, live price IDs, prod DSNs), plus the
+  **service token** for the `prd` config.
 - The images referenced by the Deployments must be reachable from the nodes.
 
 ## 1. Point kubectl at the fresh cluster

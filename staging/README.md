@@ -10,8 +10,10 @@ the Compose staging `routes.yml`). Blue is live by default.
 - Fresh RKE2 VMs: 1 control-plane + 2 workers, all `Ready` (you rebuild the
   machines between environments).
 - `kubectl` on your local machine plus the kubeconfig of the cluster.
-- In Doppler: project `astrolumina`, config `stg`, filled with every secret
-  key, plus the **service token** for the `stg` config.
+- In Doppler: project `astrolumina`, config `stg`, filled with EVERY
+  variable the stack needs (shared vars, frontend/API URLs with the
+  `staging.astrolumina.ro` host, `CORS_ORIGINS`, plus all secrets), plus the
+  **service token** for the `stg` config.
 - The images referenced by the Deployments must be reachable from the nodes.
 
 ## 1. Point kubectl at the fresh cluster

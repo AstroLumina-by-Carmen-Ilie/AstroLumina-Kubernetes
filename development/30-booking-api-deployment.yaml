@@ -43,63 +43,63 @@ spec:
           env:
             - name: NODE_ENV
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: NODE_ENV
             - name: FRONTEND_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: FRONTEND_SERVER_PORT
             - name: FRONTEND_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: FRONTEND_SERVER_DNS
             - name: ASTROLOGY_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: ASTROLOGY_API_SERVER_PORT
             - name: ASTROLOGY_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: ASTROLOGY_API_SERVER_DNS
             - name: BOOKING_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: BOOKING_API_SERVER_PORT
             - name: BOOKING_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: BOOKING_API_SERVER_DNS
             - name: PAYMENT_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: PAYMENT_API_SERVER_PORT
             - name: PAYMENT_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: PAYMENT_API_SERVER_DNS
             - name: CORS_ORIGINS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: CORS_ORIGINS
             - name: CALCOM_BASE_URL
               valueFrom:
-                configMapKeyRef:
-                  name: env-booking-api
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: CALCOM_BASE_URL
             - name: R2_BASE_URL
               valueFrom:
-                configMapKeyRef:
-                  name: env-booking-api
+                secretKeyRef:
+                  name: env-booking-api-secrets
                   key: R2_BASE_URL
             - name: CALCOM_API_KEY
               valueFrom:

@@ -48,63 +48,63 @@ spec:
           env:
             - name: NODE_ENV
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: NODE_ENV
             - name: FRONTEND_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: FRONTEND_SERVER_PORT
             - name: FRONTEND_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: FRONTEND_SERVER_DNS
             - name: ASTROLOGY_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: ASTROLOGY_API_SERVER_PORT
             - name: ASTROLOGY_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: ASTROLOGY_API_SERVER_DNS
             - name: BOOKING_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: BOOKING_API_SERVER_PORT
             - name: BOOKING_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: BOOKING_API_SERVER_DNS
             - name: PAYMENT_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: PAYMENT_API_SERVER_PORT
             - name: PAYMENT_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: PAYMENT_API_SERVER_DNS
             - name: CORS_ORIGINS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: CORS_ORIGINS
             - name: ASTROLOGER_API_URL
               valueFrom:
-                configMapKeyRef:
-                  name: env-astrology-api
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: ASTROLOGER_API_URL
             - name: ASTROLOGER_API_HOST
               valueFrom:
-                configMapKeyRef:
-                  name: env-astrology-api
+                secretKeyRef:
+                  name: env-astrology-api-secrets
                   key: ASTROLOGER_API_HOST
             - name: ASTROLOGER_API_KEY
               valueFrom:

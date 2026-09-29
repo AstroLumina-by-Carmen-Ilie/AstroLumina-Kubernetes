@@ -51,10 +51,13 @@ and what to check when a step fails.
 - **Frontend env injection**: the frontend image reads `public/env.js`
   placeholders filled by Compose-style variables (`ASTROLOGICAL_API_URL`,
   `STRIPE_PK`, `*_SERVER_DNS/PORT`, `FRONTEND_SENTRY_DSN`, `R2_BASE_URL`),
-  not `VITE_*`. The ConfigMaps therefore carry Compose-exact variable names.
+  not `VITE_*`. Those variables live in Doppler and are synced into the
+  `env-frontend-secrets` Secret, exactly like every other variable.
 - **Backend env contract**: the APIs validate their full env set at startup
   (zod, exit 1 if missing), so every Deployment wires all 9 shared vars
-  (`NODE_ENV`, `*_SERVER_PORT/DNS` x4) plus its service keys.
+  (`NODE_ENV`, `*_SERVER_PORT/DNS` x4) plus its service keys — all via
+  `secretKeyRef` into the service's Doppler-managed Secret. There are no
+  ConfigMaps left: 100% of variables come from Doppler.
 
 ## Secrets and Doppler
 
@@ -82,8 +85,12 @@ kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/lates
   -> verify sync -> delete the `- 02-secrets.yaml` line from that
   environment's `kustomization.yaml` -> re-apply. Full command sequences with
   expected outputs live in each environment's `README.md`.
-- Doppler must provide every key the Deployments reference via `secretKeyRef`
-  (Sentry DSNs, API keys, Stripe keys, price IDs, R2/D1 credentials).
+- Doppler must provide literally every variable the Deployments reference
+  via `secretKeyRef` — shared vars (`NODE_ENV`, `*_SERVER_PORT/DNS`,
+  `CORS_ORIGINS`), frontend runtime URLs, per-service URLs, plus all secrets
+  (Sentry DSNs, API keys, Stripe keys, price IDs, R2/D1 credentials). If a
+  single key is missing from the Doppler config, the pod fails at startup
+  (zod validation, exit 1) and the fix is always "add the key in Doppler".
   Deployments carry the `secrets.doppler.com/reload` annotation, so pods
   restart automatically whenever a synced value changes.
 

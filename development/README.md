@@ -11,9 +11,15 @@ booking `30303`.
 
 - RKE2 VMs up: 1 control-plane + 2 workers, all `Ready`.
 - `kubectl` on your local machine plus the kubeconfig of the cluster.
-- In Doppler: project `astrolumina`, config `dev`, filled with every secret
-  key (see step 4 for the exact list), plus the **service token** for the
-  `dev` config (Doppler dashboard -> project -> `dev` -> Access).
+- In Doppler: project `astrolumina`, config `dev`, filled with EVERY
+  variable the stack needs — not just secrets, but also the former ConfigMap
+  values: `NODE_ENV`, all `*_SERVER_PORT` / `*_SERVER_DNS`,
+  `ASTROLOGICAL_API_URL`, `PAYMENT_API_URL`, `BOOKING_API_URL`, `STRIPE_PK`,
+  `R2_BASE_URL`, `ASTROLOGER_API_URL/HOST`, `CALCOM_BASE_URL`,
+  `STRIPE_API_VER`, `CORS_ORIGINS`. Browser-facing URLs must contain the real
+  node IP (no `NODE_IP` placeholder works at runtime — resolve the IP first,
+  put the final URLs in Doppler). Plus the **service token** for the `dev`
+  config (Doppler dashboard -> project -> `dev` -> Access).
 - The images referenced by the Deployments must be reachable from the nodes
   (registry credentials / public registry).
 

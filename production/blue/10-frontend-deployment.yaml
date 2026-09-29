@@ -47,48 +47,48 @@ spec:
           env:
             - name: NODE_ENV
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: NODE_ENV
             - name: FRONTEND_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: FRONTEND_SERVER_PORT
             - name: FRONTEND_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: FRONTEND_SERVER_DNS
             - name: ASTROLOGY_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: ASTROLOGY_API_SERVER_PORT
             - name: ASTROLOGY_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: ASTROLOGY_API_SERVER_DNS
             - name: BOOKING_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: BOOKING_API_SERVER_PORT
             - name: BOOKING_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: BOOKING_API_SERVER_DNS
             - name: PAYMENT_API_SERVER_PORT
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: PAYMENT_API_SERVER_PORT
             - name: PAYMENT_API_SERVER_DNS
               valueFrom:
-                configMapKeyRef:
-                  name: env
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: PAYMENT_API_SERVER_DNS
             - name: FRONTEND_SENTRY_DSN
               valueFrom:
@@ -97,28 +97,28 @@ spec:
                   key: FRONTEND_SENTRY_DSN
             - name: ASTROLOGICAL_API_URL
               valueFrom:
-                configMapKeyRef:
-                  name: env-frontend
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: ASTROLOGICAL_API_URL
             - name: PAYMENT_API_URL
               valueFrom:
-                configMapKeyRef:
-                  name: env-frontend
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: PAYMENT_API_URL
             - name: BOOKING_API_URL
               valueFrom:
-                configMapKeyRef:
-                  name: env-frontend
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: BOOKING_API_URL
             - name: STRIPE_PK
               valueFrom:
-                configMapKeyRef:
-                  name: env-frontend
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: STRIPE_PK
             - name: R2_BASE_URL
               valueFrom:
-                configMapKeyRef:
-                  name: env-frontend
+                secretKeyRef:
+                  name: env-frontend-secrets
                   key: R2_BASE_URL
           resources:
             requests:

@@ -5,7 +5,6 @@ namespace: astrolumina-dev
 
 resources:
   - 00-namespace.yaml
-  - 01-env-configmap.yaml
   - 02-secrets.yaml
   - 03-doppler-secrets.yaml
   - 10-frontend-deployment.yaml
