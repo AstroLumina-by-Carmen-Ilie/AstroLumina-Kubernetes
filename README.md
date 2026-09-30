@@ -66,8 +66,14 @@ and what to check when a step fails.
 - The Doppler Kubernetes Operator (installed once per cluster rebuild) syncs
   one Doppler config into 4 Kubernetes Secrets per environment:
 
+Two-machine model everywhere: `doppler` runs on your LAPTOP, `kubectl`
+runs on the CONTROL PLANE via `ssh "$K8S_CP_CONN" -- "..."` (connection
+string from Doppler: `doppler secrets get K8S_CP_CONN --plain --project
+astrolumina --config <dev|stg|prd>`). The repo is mounted live at
+`/mnt/k8s` on the control plane, so `apply -k` uses that path:
+
 ```bash
-kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/latest/download/recommended.yaml
+ssh "$K8S_CP_CONN" -- "kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/latest/download/recommended.yaml"
 ```
 
 | Doppler config | Token Secret (imperative, NOT in git) | Namespace | Managed Secrets |
@@ -78,9 +84,10 @@ kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/lates
 
 - `03-doppler-secrets.yaml` in each environment holds the 4 `DopplerSecret`
   resources (one per managed Secret, key subsets included), so
-  `kubectl apply -k <env>/` brings up everything at once. Create the token
-  after each rebuild, e.g. for development:
-  `kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='<token>'`.
+  `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/<env>"` brings up
+everything at once. Create the token after each rebuild from
+`$K8S_SERVICE_TOKEN` (no dashboard copy-paste), e.g. for development:
+`ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'`.
 - Boot order per environment: apply kustomize (placeholders) -> create token
   -> verify sync -> delete the `- 02-secrets.yaml` line from that
   environment's `kustomization.yaml` -> re-apply. Full command sequences with
@@ -97,9 +104,10 @@ kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/lates
 ## Blue-green runbook (staging / production)
 
 1. Deploy to the idle color first:
-   `kubectl apply -k staging/` (or verify only green changed).
-2. Check pods and probes: `kubectl get pods -n astrolumina-staging`.
-3. Smoke-test the idle color via port-forward on its direct Service.
+   `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/staging"` (or verify only green changed).
+2. Check pods and probes: `ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-staging"`.
+3. Smoke-test the idle color via port-forward on its direct Service
+   (`ssh -L 8080:localhost:8080 "$K8S_CP_CONN" -- kubectl port-forward ...`, see staging step 7).
 4. Flip the 4 `variant:` selectors in `53-live-services.yaml`
    (`blue` <-> `green`) and re-apply.
 5. Keep the previous color running until the new one proves healthy.
@@ -125,7 +133,7 @@ kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/lates
 ## Deploy
 
 ```bash
-kubectl apply -k development/   # dev
-kubectl apply -k staging/       # staging (blue live by default)
-kubectl apply -k production/    # production (blue live by default)
+ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/development"   # dev
+ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/staging"       # staging (blue live by default)
+ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"    # production (blue live by default)
 ```

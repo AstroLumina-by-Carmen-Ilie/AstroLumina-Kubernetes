@@ -7,32 +7,53 @@ Deploys into namespace `astrolumina-prod`: blue + green variants at
 `dashboard.astrolumina.ro` protected by basicAuth. Blue is live by default.
 
 Read this whole file once before running anything: steps 2 and 3 must happen
-BEFORE the first `kubectl apply -k production/`.
+BEFORE the first `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"`.
 
 ## 0. Prerequisites (have these ready before you start)
 
 - Fresh RKE2 VMs: 1 control-plane + 2 workers, all `Ready`.
-- `kubectl` on your local machine plus the kubeconfig of the cluster.
+- Two-machine model: `doppler` CLI (logged in) runs on your LAPTOP — it only
+  reads secrets into shell variables. `kubectl` runs on the CONTROL PLANE
+  only, so every `kubectl` below is prefixed with
+  `ssh "$K8S_CP_CONN" -- "..."`. This repo is mounted live at `/mnt/k8s`
+  on the control plane — edits you make here apply straight from there, no
+  `git pull` needed on the VM.
 - In Doppler: project `astrolumina`, config `prd` with LIVE values for
   EVERY variable (shared vars, frontend/API URLs with the `astrolumina.ro`
   host, `CORS_ORIGINS`, `sk_live_`, live price IDs, prod DSNs). It must
-  also contain `GITHUB_USER` and `GITHUB_TOKEN` (PAT with `read:packages`)
-  — the GHCR credentials used in step 5b. It must also contain the four image
-  tags `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
+  also contain `GITHUB_USER`, `GITHUB_TOKEN` (PAT with `read:packages`) and
+  `GITHUB_EMAIL` — the GHCR credentials used in step 5b. It must also contain
+  the four image tags `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
   `ASTROLOGY_API_DOCKER_IMAGE_TAG` (2.0.6), `BOOKING_API_DOCKER_IMAGE_TAG`
   (2.0.5), `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6) — the exact tags pinned
-  in step 5c. Plus the **service token** for
-  the `prd` config.
+  in step 5c. Plus, before step 6, export `K8S_SERVICE_TOKEN` with the
+  service token of the `prd` config — one `export` in your shell, step 6
+  consumes it directly, no dashboard copy-paste involved.
 - The images referenced by the Deployments are private on GHCR. Every
   blue/green Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
   `01-ghcr-secret.yaml` ships as a placeholder; step 5b replaces it with
   the real secret built from the Doppler `GITHUB_USER` / `GITHUB_TOKEN`.
 
-## 1. Point kubectl at the fresh cluster
+## 1. Connect to the control plane (laptop → CP)
+
+`K8S_CP_CONN` (e.g. `ubuntu@192.168.122.10`) already lives in Doppler
+(config `prd`). Export it once per shell, then run `kubectl` on the CP
+through it. Quoting rule for every `ssh` below: the remote command sits in
+DOUBLE quotes, so `$VARS` from `doppler` expand on your laptop (intended —
+the CP never sees Doppler), while `|` pipes inside the quotes still execute
+on the CP:
 
 ```bash
-export KUBECONFIG=/path/to/rke2.yaml
-kubectl get nodes
+export K8S_CP_CONN=$(doppler secrets get K8S_CP_CONN --plain --project astrolumina --config prd)
+ssh "$K8S_CP_CONN" -- "kubectl get nodes"
+```
+
+If `kubectl: command not found` (fresh VM — RKE2 hides its binary outside
+the default PATH and ships no kubeconfig for your user), run this once per
+control plane — afterwards plain `kubectl` works in every `ssh` below:
+
+```bash
+ssh "$K8S_CP_CONN" -- "sudo ln -sf /var/lib/rancher/rke2/bin/kubectl /usr/local/bin/kubectl && mkdir -p ~/.kube && sudo cat /etc/rancher/rke2/rke2.yaml > ~/.kube/config && chmod 600 ~/.kube/config && kubectl get nodes"
 ```
 
 Expected: 3 nodes, all `Ready`. If not, stop here and fix the VMs first.
@@ -41,10 +62,12 @@ Expected: 3 nodes, all `Ready`. If not, stop here and fix the VMs first.
 
 RKE2 installs Traefik from a HelmChart without any certResolver. The
 production IngressRoute references a resolver named `letsencrypt`, so create
-it before deploying anything. On the **control-plane node**, write
-`/var/lib/rancher/rke2/server/manifests/traefik-config.yaml`:
+it before deploying anything — one `ssh` writing the file on the CP
+(`tee` needs `sudo` for the RKE2 manifests dir; the `<<'EOF'` heredoc is
+quoted so nothing expands anywhere by accident):
 
-```yaml
+```bash
+ssh "$K8S_CP_CONN" -- "sudo tee /var/lib/rancher/rke2/server/manifests/traefik-config.yaml > /dev/null <<'EOF'
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig
 metadata:
@@ -60,14 +83,15 @@ spec:
         storage: /data/acme.json
         httpChallenge:
           entryPoint: web
+EOF"
 ```
 
 RKE2 picks the file up automatically and restarts Traefik. Verify the pod
 came back and the resolver is known:
 
 ```bash
-kubectl -n kube-system get pods | grep traefik
-kubectl -n kube-system logs <traefik-pod-name> | grep -i "letsencrypt\|acme" | head -5
+ssh "$K8S_CP_CONN" -- "kubectl -n kube-system get pods | grep traefik"
+ssh "$K8S_CP_CONN" -- "kubectl -n kube-system logs deploy/rke2-traefik | grep -i letsencrypt | head -5"
 ```
 
 IMPORTANT, read twice: Let's Encrypt `httpChallenge` requires the public
@@ -82,7 +106,8 @@ at the node and re-apply.
 ## 3. Set the dashboard password (REQUIRED, before first apply)
 
 `54-dashboard-auth-secret.yaml` ships with a placeholder. Generate the real
-hash (needs the `htpasswd` binary; `apt install apache2-utils` on Debian):
+hash on your LAPTOP (needs the `htpasswd` binary; `apt install apache2-utils`
+on Debian), then edit the local file — the CP sees it live at `/mnt/k8s`:
 
 ```bash
 htpasswd -nbB admin '<choose-a-strong-password>'
@@ -96,9 +121,9 @@ this repo is shared; inject it at deploy time instead.
 ## 4. Install the Doppler operator (once per cluster rebuild)
 
 ```bash
-kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/latest/download/recommended.yaml
-kubectl wait --for=condition=Available deploy -n doppler-operator-system --all --timeout=180s
-kubectl get crd dopplersecrets.secrets.doppler.com
+ssh "$K8S_CP_CONN" -- "kubectl apply -f https://github.com/DopplerHQ/kubernetes-operator/releases/latest/download/recommended.yaml"
+ssh "$K8S_CP_CONN" -- "kubectl wait --for=condition=Available deploy -n doppler-operator-system --all --timeout=180s"
+ssh "$K8S_CP_CONN" -- "kubectl get crd dopplersecrets.secrets.doppler.com"
 ```
 
 Expected: deployment `Available`, CRD exists.
@@ -106,9 +131,8 @@ Expected: deployment `Available`, CRD exists.
 ## 5. Deploy production (placeholders first, real dashboard hash)
 
 ```bash
-cd AstroLumina-Kubernetes
-kubectl apply -k production/
-kubectl get pods -n astrolumina-prod
+ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"
+ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-prod"
 ```
 
 Expected: 8 pods created. They will show `ImagePullBackOff` / `ErrImagePull`
@@ -116,46 +140,39 @@ until step 5b replaces the `ghcr-secret` placeholder — that is normal.
 On `CrashLoopBackOff` (pulled fine, then crashed), inspect first:
 
 ```bash
-kubectl logs -n astrolumina-prod deploy/frontend-blue --tail=30
+ssh "$K8S_CP_CONN" -- "kubectl logs -n astrolumina-prod deploy/frontend-blue --tail=30"
 ```
 
 ## 5b. Create the GHCR pull secret (REQUIRED, once per cluster rebuild)
 
 `01-ghcr-secret.yaml` applied in step 5 is a placeholder with fake
 credentials, so kubelet cannot pull the private GHCR images yet. The real
-`GITHUB_USER` / `GITHUB_TOKEN` already live in Doppler (config `prd`) —
-build the real secret imperatively (same pattern as `doppler-token-prd`;
-it cannot be synced by the Doppler operator because a pull secret must be
+`GITHUB_USER` / `GITHUB_TOKEN` / `GITHUB_EMAIL` already live in Doppler
+(config `prd`) — build the real secret imperatively from them, zero
+copy-paste (same pattern as `doppler-token-prd`; it cannot be synced by the
+Doppler operator because a pull secret must be
 `type: kubernetes.io/dockerconfigjson`, not `Opaque`):
 
-```bash
-kubectl create secret docker-registry ghcr-secret \
-  -n astrolumina-prod \
-  --docker-server=ghcr.io \
-  --docker-username='<paste-GITHUB_USER-from-Doppler-prd>' \
-  --docker-password='<paste-GITHUB_TOKEN-from-Doppler-prd>' \
-  --docker-email='admin@astrolumina.com' \
-  --dry-run=client -o yaml | kubectl apply -f -
-```
-
-Or straight from the Doppler CLI:
+The three `export` lines run on your LAPTOP (Doppler lives here). The
+`kubectl create` runs on the CP — note the quote splice
+`'...'"$VAR"'...'`: secret values expand locally, so tokens with `$`,
+`!` or quotes survive the trip intact, while the `|` pipe still executes
+remotely:
 
 ```bash
 export GITHUB_USER=$(doppler secrets get GITHUB_USER --plain --project astrolumina --config prd)
 export GITHUB_TOKEN=$(doppler secrets get GITHUB_TOKEN --plain --project astrolumina --config prd)
-kubectl create secret docker-registry ghcr-secret -n astrolumina-prod \
-  --docker-server=ghcr.io --docker-username="$GITHUB_USER" \
-  --docker-password="$GITHUB_TOKEN" --docker-email='admin@astrolumina.com' \
-  --dry-run=client -o yaml | kubectl apply -f -
-unset GITHUB_TOKEN GITHUB_USER
+export GITHUB_EMAIL=$(doppler secrets get GITHUB_EMAIL --plain --project astrolumina --config prd)
+ssh "$K8S_CP_CONN" -- 'kubectl create secret docker-registry ghcr-secret -n astrolumina-prod --docker-server=ghcr.io --docker-username='"$GITHUB_USER"' --docker-password='"$GITHUB_TOKEN"' --docker-email='"$GITHUB_EMAIL"' --dry-run=client -o yaml | kubectl apply -f -'
+unset GITHUB_TOKEN GITHUB_USER GITHUB_EMAIL
 ```
 
 Then force a re-pull and verify:
 
 ```bash
-kubectl rollout restart deploy -n astrolumina-prod
-kubectl get pods -n astrolumina-prod
-kubectl get events -n astrolumina-prod --sort-by=.lastTimestamp | tail -10
+ssh "$K8S_CP_CONN" -- "kubectl rollout restart deploy -n astrolumina-prod"
+ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-prod"
+ssh "$K8S_CP_CONN" -- "kubectl get events -n astrolumina-prod --sort-by=.lastTimestamp | tail -10"
 ```
 
 Expected: pods leave `ImagePullBackOff` and reach `Running` (they still boot
@@ -170,7 +187,9 @@ in Doppler (config `prd`): `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
 `ASTROLOGY_API_DOCKER_IMAGE_TAG` (2.0.6), `BOOKING_API_DOCKER_IMAGE_TAG`
 (2.0.5), `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6). (A Deployment's `image:`
 field is static — Kubernetes cannot read it from a Secret — so the tags are
-applied imperatively here, same pattern as steps 5b and 6.) Pin both colors:
+applied imperatively here, same pattern as steps 5b and 6.) `export` lines
+on the laptop, `set image` on the CP (tags are plain version strings,
+double quotes are safe). Pin both colors:
 
 ```bash
 export FRONTEND_TAG=$(doppler secrets get FRONTEND_DOCKER_IMAGE_TAG --plain --project astrolumina --config prd)
@@ -178,13 +197,13 @@ export ASTROLOGY_TAG=$(doppler secrets get ASTROLOGY_API_DOCKER_IMAGE_TAG --plai
 export BOOKING_TAG=$(doppler secrets get BOOKING_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config prd)
 export PAYMENT_TAG=$(doppler secrets get PAYMENT_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config prd)
 for COLOR in blue green; do
-  kubectl set image deploy/frontend-$COLOR frontend=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:$FRONTEND_TAG -n astrolumina-prod
-  kubectl set image deploy/astrology-api-$COLOR astrology-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:$ASTROLOGY_TAG -n astrolumina-prod
-  kubectl set image deploy/booking-api-$COLOR booking-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:$BOOKING_TAG -n astrolumina-prod
-  kubectl set image deploy/payment-api-$COLOR payment-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:$PAYMENT_TAG -n astrolumina-prod
+  ssh "$K8S_CP_CONN" -- "kubectl set image deploy/frontend-$COLOR frontend=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:$FRONTEND_TAG -n astrolumina-prod"
+  ssh "$K8S_CP_CONN" -- "kubectl set image deploy/astrology-api-$COLOR astrology-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:$ASTROLOGY_TAG -n astrolumina-prod"
+  ssh "$K8S_CP_CONN" -- "kubectl set image deploy/booking-api-$COLOR booking-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:$BOOKING_TAG -n astrolumina-prod"
+  ssh "$K8S_CP_CONN" -- "kubectl set image deploy/payment-api-$COLOR payment-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:$PAYMENT_TAG -n astrolumina-prod"
 done
 unset FRONTEND_TAG ASTROLOGY_TAG BOOKING_TAG PAYMENT_TAG
-kubectl get pods -n astrolumina-prod
+ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-prod"
 ```
 
 Without the Doppler CLI, copy the 4 values from the dashboard and substitute
@@ -199,18 +218,31 @@ on BOTH colors every time you promote a new build.
 
 ## 6. Create the token Secret and let the operator sync
 
+The token is deliberately NOT in git. `K8S_SERVICE_TOKEN` (exported in the
+prerequisites) holds the service token for the `prd` config — consume it
+directly, no dashboard involved (idempotent, safe to re-run):
+
 ```bash
-kubectl create secret generic doppler-token-prd -n doppler-operator-system \
-  --from-literal=serviceToken='<paste-production-service-token-here>'
+ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-prd -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'
 ```
+
+No `K8S_SERVICE_TOKEN` in this shell? Generate one without touching the
+dashboard (uses your existing Doppler CLI login):
+
+```bash
+export K8S_SERVICE_TOKEN=$(doppler configs tokens create k8s-prd --project astrolumina --config prd --plain)
+```
+
+then re-run the `kubectl create secret` above. (Generated tokens pile up in
+Doppler — revoke the ones you no longer use:
+`doppler configs tokens revoke <token-id> --project astrolumina --config prd`.)
 
 Verify (prints only the first 8 chars of one key):
 
 ```bash
-kubectl get dopplersecrets -n doppler-operator-system
-kubectl describe dopplersecret astrolumina-production-payment-api -n doppler-operator-system
-kubectl get secret env-payment-api-secrets -n astrolumina-prod \
-  -o jsonpath='{.data.STRIPE_SK}' | base64 -d | cut -c1-8
+ssh "$K8S_CP_CONN" -- "kubectl get dopplersecrets -n doppler-operator-system"
+ssh "$K8S_CP_CONN" -- "kubectl describe dopplersecret astrolumina-production-payment-api -n doppler-operator-system"
+ssh "$K8S_CP_CONN" -- "kubectl get secret env-payment-api-secrets -n astrolumina-prod -o jsonpath='{.data.STRIPE_SK}' | base64 -d | cut -c1-8"
 ```
 
 Expected: no errors; the key starts with `sk_live_` (NOT `sk_test_`, NOT the
@@ -223,13 +255,13 @@ real money with test keys fails, and vice versa.
 2. Re-apply and confirm the automatic restart:
 
 ```bash
-kubectl apply -k production/
-kubectl get pods -n astrolumina-prod
+ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"
+ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-prod"
 ```
 
 ## 8. Reach it from your host
 
-Get a node IP (`kubectl get nodes -o wide`) and add to `/etc/hosts`:
+Get a node IP (`ssh "$K8S_CP_CONN" -- "kubectl get nodes -o wide"`) and add to `/etc/hosts` on your laptop:
 
 ```text
 192.168.1.10 astrolumina.ro dashboard.astrolumina.ro
@@ -237,7 +269,7 @@ Get a node IP (`kubectl get nodes -o wide`) and add to `/etc/hosts`:
 
 - App: `https://astrolumina.ro`
 - Dashboard: `https://dashboard.astrolumina.ro` (admin + password from step 3)
-- API spot checks:
+- API spot checks (from your LAPTOP — they test your host → node path):
 
 ```bash
 curl -sk -o /dev/null -w '%{http_code}\n' https://astrolumina.ro/api/astrology/<health-path>
@@ -257,19 +289,21 @@ Expected issuer: Let's Encrypt.
 
 ## 9. Blue-green cutover
 
-Same drill as staging (see `staging/README.md` step 7): verify green,
-port-forward smoke test, flip the 4 `variant:` selectors in
-`53-live-services.yaml`, re-apply, re-run the step 8 checks.
+Same drill as staging (see `staging/README.md` step 7): verify green
+(`ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-prod -l variant=green"`),
+port-forward smoke test via `ssh -L`, flip the 4 `variant:` selectors in
+`53-live-services.yaml`, re-apply (`ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"`),
+re-run the step 8 checks.
 
 ## 10. If something is wrong
 
 - Pod stuck in `ImagePullBackOff` / `ErrImagePull` after step 5b: the
   `ghcr-secret` is missing, still the placeholder, or the Doppler
   `GITHUB_TOKEN` is expired / lacks `read:packages`. Check with
-  `kubectl get secret ghcr-secret -n astrolumina-prod` and
-  `kubectl get events -n astrolumina-prod --sort-by=.lastTimestamp | tail -10`.
+  `ssh "$K8S_CP_CONN" -- "kubectl get secret ghcr-secret -n astrolumina-prod"`
+  and `ssh "$K8S_CP_CONN" -- "kubectl get events -n astrolumina-prod --sort-by=.lastTimestamp | tail -10"`.
   Recreate the secret with the command from step 5b, then
-  `kubectl rollout restart deploy -n astrolumina-prod`. (The old Compose
+  `ssh "$K8S_CP_CONN" -- "kubectl rollout restart deploy -n astrolumina-prod"`. (The old Compose
   equivalent was `echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER
   --password-stdin` — in K8s the kubelet needs the secret, not a node-local
 docker login.)
@@ -281,11 +315,11 @@ docker login.)
   with extra whitespace. Fix, re-apply, restart Traefik pod.
 - Pod `CrashLoopBackOff` with missing env: add the key to the Doppler `prd`
   config; sync + restart are automatic.
-- `kubectl get dopplersecrets -n doppler-operator-system` shows nothing:
-  first check `kubectl get dopplersecrets -A` (maybe they landed in the app
+- `ssh "$K8S_CP_CONN" -- "kubectl get dopplersecrets -n doppler-operator-system"`
+  shows nothing: first check with `-A` (maybe they landed in the app
   namespace — that means your checkout predates the kustomization namespace
   fix; pull latest and re-apply), then confirm the operator install from
-  step 4 with `kubectl get crd dopplersecrets.secrets.doppler.com`.
+  step 4 (`ssh "$K8S_CP_CONN" -- "kubectl get crd dopplersecrets.secrets.doppler.com"`).
 - `kubectl get secrets` / `get pods` with no `-n` only shows the `default`
   namespace — always pass `-n astrolumina-prod` for this stack.
 - HPA `<unknown>` metrics: install metrics-server if you want real
