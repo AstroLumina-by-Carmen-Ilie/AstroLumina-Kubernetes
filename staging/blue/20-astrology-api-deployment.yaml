@@ -96,6 +96,7 @@ spec:
                 secretKeyRef:
                   name: env-astrology-api-secrets
                   key: CORS_ORIGINS
+                  optional: true
             - name: ASTROLOGER_API_URL
               valueFrom:
                 secretKeyRef:

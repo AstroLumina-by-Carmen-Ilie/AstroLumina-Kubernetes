@@ -95,6 +95,7 @@ spec:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: CORS_ORIGINS
+                  optional: true
             - name: CALCOM_BASE_URL
               valueFrom:
                 secretKeyRef:

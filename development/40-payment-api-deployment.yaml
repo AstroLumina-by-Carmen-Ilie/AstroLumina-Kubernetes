@@ -92,6 +92,7 @@ spec:
                 secretKeyRef:
                   name: env-payment-api-secrets
                   key: CORS_ORIGINS
+                  optional: true
             - name: STRIPE_API_VER
               valueFrom:
                 secretKeyRef:
