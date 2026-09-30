@@ -34,7 +34,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: astrology-api
-          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:2.0.1
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:latest
           imagePullPolicy: Always
           ports:
             - name: http

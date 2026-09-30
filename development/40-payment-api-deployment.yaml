@@ -34,7 +34,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: payment-api
-          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:2.0.1
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:latest
           imagePullPolicy: Always
           ports:
             - name: http

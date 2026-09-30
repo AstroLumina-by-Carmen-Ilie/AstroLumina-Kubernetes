@@ -34,7 +34,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: booking-api
-          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:2.0.1
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:latest
           imagePullPolicy: Always
           ports:
             - name: http

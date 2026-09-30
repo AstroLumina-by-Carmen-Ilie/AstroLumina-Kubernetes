@@ -20,7 +20,10 @@ booking `30303`.
   node IP (no `NODE_IP` placeholder works at runtime — resolve the IP first,
   put the final URLs in Doppler). It must also contain `GITHUB_USER` and
   `GITHUB_TOKEN` (PAT with `read:packages`) — the GHCR credentials used in
-  step 3b. Plus the **service token** for the `dev` config (Doppler dashboard
+  step 3b. It must also contain the four image tags
+  `FRONTEND_DOCKER_IMAGE_TAG`, `ASTROLOGY_API_DOCKER_IMAGE_TAG`,
+  `BOOKING_API_DOCKER_IMAGE_TAG`, `PAYMENT_API_DOCKER_IMAGE_TAG` (all
+  `latest` for dev — the exact tags pinned in step 3c). Plus the **service token** for the `dev` config (Doppler dashboard
   -> project -> `dev` -> Access).
 - The images referenced by the Deployments are private on GHCR. Every
   Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
@@ -109,6 +112,39 @@ Expected: pods leave `ImagePullBackOff` and reach `Running` (they still boot
 with the `02-secrets.yaml` placeholder env values until step 4 syncs Doppler).
 Do NOT commit the real credentials — `01-ghcr-secret.yaml` stays a placeholder
 in git.
+
+## 3c. Pin the images to the Doppler tags
+
+The manifests ship every image as `:latest`. The real tag per service lives
+in Doppler (config `dev`): `FRONTEND_DOCKER_IMAGE_TAG`,
+`ASTROLOGY_API_DOCKER_IMAGE_TAG`, `BOOKING_API_DOCKER_IMAGE_TAG`,
+`PAYMENT_API_DOCKER_IMAGE_TAG`. (A Deployment's `image:` field is static —
+Kubernetes cannot read it from a Secret — so the tags are applied
+imperatively here, same pattern as steps 3b and 4. `imagePullPolicy` stays
+`Always`, so `:latest` still resolves fresh even before this step runs.)
+For dev those keys hold `latest`; read them and set the images:
+
+```bash
+export FRONTEND_TAG=$(doppler secrets get FRONTEND_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
+export ASTROLOGY_TAG=$(doppler secrets get ASTROLOGY_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
+export BOOKING_TAG=$(doppler secrets get BOOKING_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
+export PAYMENT_TAG=$(doppler secrets get PAYMENT_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
+kubectl set image deploy/frontend frontend=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:$FRONTEND_TAG -n astrolumina-dev
+kubectl set image deploy/astrology-api astrology-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:$ASTROLOGY_TAG -n astrolumina-dev
+kubectl set image deploy/booking-api booking-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:$BOOKING_TAG -n astrolumina-dev
+kubectl set image deploy/payment-api payment-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:$PAYMENT_TAG -n astrolumina-dev
+unset FRONTEND_TAG ASTROLOGY_TAG BOOKING_TAG PAYMENT_TAG
+kubectl rollout status deploy/frontend -n astrolumina-dev
+kubectl get pods -n astrolumina-dev
+```
+
+Without the Doppler CLI, copy the 4 values from the dashboard and substitute
+them for the `$..._TAG` variables above.
+
+Expected: the Deployments restart on the exact tags from Doppler
+(`kubectl describe deploy/frontend -n astrolumina-dev | grep Image:` shows
+the tag). If a pod reports `ErrImagePull` with `manifest unknown`, the tag
+in Doppler does not exist on GHCR — fix the value in Doppler and re-run.
 
 ## 4. Create the token Secret and let the operator sync
 

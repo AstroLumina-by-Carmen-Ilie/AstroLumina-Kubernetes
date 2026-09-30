@@ -17,7 +17,11 @@ BEFORE the first `kubectl apply -k production/`.
   EVERY variable (shared vars, frontend/API URLs with the `astrolumina.ro`
   host, `CORS_ORIGINS`, `sk_live_`, live price IDs, prod DSNs). It must
   also contain `GITHUB_USER` and `GITHUB_TOKEN` (PAT with `read:packages`)
-  — the GHCR credentials used in step 5b. Plus the **service token** for
+  — the GHCR credentials used in step 5b. It must also contain the four image
+  tags `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
+  `ASTROLOGY_API_DOCKER_IMAGE_TAG` (2.0.6), `BOOKING_API_DOCKER_IMAGE_TAG`
+  (2.0.5), `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6) — the exact tags pinned
+  in step 5c. Plus the **service token** for
   the `prd` config.
 - The images referenced by the Deployments are private on GHCR. Every
   blue/green Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
@@ -158,6 +162,40 @@ Expected: pods leave `ImagePullBackOff` and reach `Running` (they still boot
 with the `02-secrets.yaml` placeholder env values until step 6 syncs Doppler).
 Do NOT commit the real credentials — `01-ghcr-secret.yaml` stays a placeholder
 in git.
+
+## 5c. Pin the images to the Doppler tags (blue AND green)
+
+The manifests ship every image as `:latest`. The real tag per service lives
+in Doppler (config `prd`): `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
+`ASTROLOGY_API_DOCKER_IMAGE_TAG` (2.0.6), `BOOKING_API_DOCKER_IMAGE_TAG`
+(2.0.5), `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6). (A Deployment's `image:`
+field is static — Kubernetes cannot read it from a Secret — so the tags are
+applied imperatively here, same pattern as steps 5b and 6.) Pin both colors:
+
+```bash
+export FRONTEND_TAG=$(doppler secrets get FRONTEND_DOCKER_IMAGE_TAG --plain --project astrolumina --config prd)
+export ASTROLOGY_TAG=$(doppler secrets get ASTROLOGY_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config prd)
+export BOOKING_TAG=$(doppler secrets get BOOKING_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config prd)
+export PAYMENT_TAG=$(doppler secrets get PAYMENT_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config prd)
+for COLOR in blue green; do
+  kubectl set image deploy/frontend-$COLOR frontend=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:$FRONTEND_TAG -n astrolumina-prod
+  kubectl set image deploy/astrology-api-$COLOR astrology-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:$ASTROLOGY_TAG -n astrolumina-prod
+  kubectl set image deploy/booking-api-$COLOR booking-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:$BOOKING_TAG -n astrolumina-prod
+  kubectl set image deploy/payment-api-$COLOR payment-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:$PAYMENT_TAG -n astrolumina-prod
+done
+unset FRONTEND_TAG ASTROLOGY_TAG BOOKING_TAG PAYMENT_TAG
+kubectl get pods -n astrolumina-prod
+```
+
+Without the Doppler CLI, copy the 4 values from the dashboard and substitute
+them for the `$..._TAG` variables above.
+
+Expected: all 8 Deployments restart on the exact tags from Doppler.
+Double-check you read the `prd` config, not `stg` — deploying staging tags
+to production is the classic blue-green footgun this step exists to prevent.
+If a pod reports `ErrImagePull` with `manifest unknown`, the tag in Doppler
+does not exist on GHCR — fix the value in Doppler and re-run. Run this again
+on BOTH colors every time you promote a new build.
 
 ## 6. Create the token Secret and let the operator sync
 

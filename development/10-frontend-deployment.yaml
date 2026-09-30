@@ -34,7 +34,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: frontend
-          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:2.0.2
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:latest
           imagePullPolicy: Always
           ports:
             - name: http
