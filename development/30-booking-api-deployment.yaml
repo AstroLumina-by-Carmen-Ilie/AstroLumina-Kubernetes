@@ -30,6 +30,8 @@ spec:
         app.kubernetes.io/component: booking-api
         environment: development
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: booking-api
           image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:2.0.1

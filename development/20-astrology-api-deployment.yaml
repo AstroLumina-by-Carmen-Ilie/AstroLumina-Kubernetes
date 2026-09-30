@@ -30,6 +30,8 @@ spec:
         app.kubernetes.io/component: astrology-api
         environment: development
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: astrology-api
           image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:2.0.1

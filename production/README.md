@@ -15,9 +15,14 @@ BEFORE the first `kubectl apply -k production/`.
 - `kubectl` on your local machine plus the kubeconfig of the cluster.
 - In Doppler: project `astrolumina`, config `prd` with LIVE values for
   EVERY variable (shared vars, frontend/API URLs with the `astrolumina.ro`
-  host, `CORS_ORIGINS`, `sk_live_`, live price IDs, prod DSNs), plus the
-  **service token** for the `prd` config.
-- The images referenced by the Deployments must be reachable from the nodes.
+  host, `CORS_ORIGINS`, `sk_live_`, live price IDs, prod DSNs). It must
+  also contain `GITHUB_USER` and `GITHUB_TOKEN` (PAT with `read:packages`)
+  — the GHCR credentials used in step 5b. Plus the **service token** for
+  the `prd` config.
+- The images referenced by the Deployments are private on GHCR. Every
+  blue/green Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
+  `01-ghcr-secret.yaml` ships as a placeholder; step 5b replaces it with
+  the real secret built from the Doppler `GITHUB_USER` / `GITHUB_TOKEN`.
 
 ## 1. Point kubectl at the fresh cluster
 
@@ -102,11 +107,57 @@ kubectl apply -k production/
 kubectl get pods -n astrolumina-prod
 ```
 
-Expected: 8 pods, all `Running`. On failure, inspect first:
+Expected: 8 pods created. They will show `ImagePullBackOff` / `ErrImagePull`
+until step 5b replaces the `ghcr-secret` placeholder — that is normal.
+On `CrashLoopBackOff` (pulled fine, then crashed), inspect first:
 
 ```bash
 kubectl logs -n astrolumina-prod deploy/frontend-blue --tail=30
 ```
+
+## 5b. Create the GHCR pull secret (REQUIRED, once per cluster rebuild)
+
+`01-ghcr-secret.yaml` applied in step 5 is a placeholder with fake
+credentials, so kubelet cannot pull the private GHCR images yet. The real
+`GITHUB_USER` / `GITHUB_TOKEN` already live in Doppler (config `prd`) —
+build the real secret imperatively (same pattern as `doppler-token-prd`;
+it cannot be synced by the Doppler operator because a pull secret must be
+`type: kubernetes.io/dockerconfigjson`, not `Opaque`):
+
+```bash
+kubectl create secret docker-registry ghcr-secret \
+  -n astrolumina-prod \
+  --docker-server=ghcr.io \
+  --docker-username='<paste-GITHUB_USER-from-Doppler-prd>' \
+  --docker-password='<paste-GITHUB_TOKEN-from-Doppler-prd>' \
+  --docker-email='admin@astrolumina.com' \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Or straight from the Doppler CLI:
+
+```bash
+export GITHUB_USER=$(doppler secrets get GITHUB_USER --plain --project astrolumina --config prd)
+export GITHUB_TOKEN=$(doppler secrets get GITHUB_TOKEN --plain --project astrolumina --config prd)
+kubectl create secret docker-registry ghcr-secret -n astrolumina-prod \
+  --docker-server=ghcr.io --docker-username="$GITHUB_USER" \
+  --docker-password="$GITHUB_TOKEN" --docker-email='admin@astrolumina.com' \
+  --dry-run=client -o yaml | kubectl apply -f -
+unset GITHUB_TOKEN GITHUB_USER
+```
+
+Then force a re-pull and verify:
+
+```bash
+kubectl rollout restart deploy -n astrolumina-prod
+kubectl get pods -n astrolumina-prod
+kubectl get events -n astrolumina-prod --sort-by=.lastTimestamp | tail -10
+```
+
+Expected: pods leave `ImagePullBackOff` and reach `Running` (they still boot
+with the `02-secrets.yaml` placeholder env values until step 6 syncs Doppler).
+Do NOT commit the real credentials — `01-ghcr-secret.yaml` stays a placeholder
+in git.
 
 ## 6. Create the token Secret and let the operator sync
 
@@ -174,6 +225,16 @@ port-forward smoke test, flip the 4 `variant:` selectors in
 
 ## 10. If something is wrong
 
+- Pod stuck in `ImagePullBackOff` / `ErrImagePull` after step 5b: the
+  `ghcr-secret` is missing, still the placeholder, or the Doppler
+  `GITHUB_TOKEN` is expired / lacks `read:packages`. Check with
+  `kubectl get secret ghcr-secret -n astrolumina-prod` and
+  `kubectl get events -n astrolumina-prod --sort-by=.lastTimestamp | tail -10`.
+  Recreate the secret with the command from step 5b, then
+  `kubectl rollout restart deploy -n astrolumina-prod`. (The old Compose
+  equivalent was `echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER
+  --password-stdin` — in K8s the kubelet needs the secret, not a node-local
+docker login.)
 - Browser cert warning on a supposedly public setup: LE never issued.
   Check Traefik logs for ACME errors (usually port 80 not publicly
   reachable, or wrong email/rate limits). See the IMPORTANT note in step 2.
@@ -182,5 +243,12 @@ port-forward smoke test, flip the 4 `variant:` selectors in
   with extra whitespace. Fix, re-apply, restart Traefik pod.
 - Pod `CrashLoopBackOff` with missing env: add the key to the Doppler `prd`
   config; sync + restart are automatic.
+- `kubectl get dopplersecrets -n doppler-operator-system` shows nothing:
+  first check `kubectl get dopplersecrets -A` (maybe they landed in the app
+  namespace — that means your checkout predates the kustomization namespace
+  fix; pull latest and re-apply), then confirm the operator install from
+  step 4 with `kubectl get crd dopplersecrets.secrets.doppler.com`.
+- `kubectl get secrets` / `get pods` with no `-n` only shows the `default`
+  namespace — always pass `-n astrolumina-prod` for this stack.
 - HPA `<unknown>` metrics: install metrics-server if you want real
   autoscaling data; harmless otherwise.

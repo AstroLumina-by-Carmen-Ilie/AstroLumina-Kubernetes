@@ -12,9 +12,14 @@ the Compose staging `routes.yml`). Blue is live by default.
 - `kubectl` on your local machine plus the kubeconfig of the cluster.
 - In Doppler: project `astrolumina`, config `stg`, filled with EVERY
   variable the stack needs (shared vars, frontend/API URLs with the
-  `staging.astrolumina.ro` host, `CORS_ORIGINS`, plus all secrets), plus the
-  **service token** for the `stg` config.
-- The images referenced by the Deployments must be reachable from the nodes.
+  `staging.astrolumina.ro` host, `CORS_ORIGINS`, plus all secrets). It must
+  also contain `GITHUB_USER` and `GITHUB_TOKEN` (PAT with `read:packages`)
+  — the GHCR credentials used in step 3b. Plus the **service token** for
+  the `stg` config.
+- The images referenced by the Deployments are private on GHCR. Every
+  blue/green Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
+  `01-ghcr-secret.yaml` ships as a placeholder; step 3b replaces it with
+  the real secret built from the Doppler `GITHUB_USER` / `GITHUB_TOKEN`.
 
 ## 1. Point kubectl at the fresh cluster
 
@@ -43,12 +48,58 @@ kubectl apply -k staging/
 kubectl get pods -n astrolumina-staging
 ```
 
-Expected: 8 pods (`*-blue` and `*-green`), all `Running`. If any pod is
-`CrashLoopBackOff`, inspect before continuing:
+Expected: 8 pods created (`*-blue` and `*-green`). They will show
+`ImagePullBackOff` / `ErrImagePull` until step 3b replaces the `ghcr-secret`
+placeholder — that is normal. If any pod is `CrashLoopBackOff` (pulled fine,
+then crashed), inspect before continuing:
 
 ```bash
 kubectl logs -n astrolumina-staging deploy/frontend-blue --tail=30
 ```
+
+## 3b. Create the GHCR pull secret (REQUIRED, once per cluster rebuild)
+
+`01-ghcr-secret.yaml` applied in step 3 is a placeholder with fake
+credentials, so kubelet cannot pull the private GHCR images yet. The real
+`GITHUB_USER` / `GITHUB_TOKEN` already live in Doppler (config `stg`) —
+build the real secret imperatively (same pattern as `doppler-token-stg`;
+it cannot be synced by the Doppler operator because a pull secret must be
+`type: kubernetes.io/dockerconfigjson`, not `Opaque`):
+
+```bash
+kubectl create secret docker-registry ghcr-secret \
+  -n astrolumina-staging \
+  --docker-server=ghcr.io \
+  --docker-username='<paste-GITHUB_USER-from-Doppler-stg>' \
+  --docker-password='<paste-GITHUB_TOKEN-from-Doppler-stg>' \
+  --docker-email='admin@astrolumina.com' \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Or straight from the Doppler CLI:
+
+```bash
+export GITHUB_USER=$(doppler secrets get GITHUB_USER --plain --project astrolumina --config stg)
+export GITHUB_TOKEN=$(doppler secrets get GITHUB_TOKEN --plain --project astrolumina --config stg)
+kubectl create secret docker-registry ghcr-secret -n astrolumina-staging \
+  --docker-server=ghcr.io --docker-username="$GITHUB_USER" \
+  --docker-password="$GITHUB_TOKEN" --docker-email='admin@astrolumina.com' \
+  --dry-run=client -o yaml | kubectl apply -f -
+unset GITHUB_TOKEN GITHUB_USER
+```
+
+Then force a re-pull and verify:
+
+```bash
+kubectl rollout restart deploy -n astrolumina-staging
+kubectl get pods -n astrolumina-staging
+kubectl get events -n astrolumina-staging --sort-by=.lastTimestamp | tail -10
+```
+
+Expected: pods leave `ImagePullBackOff` and reach `Running` (they still boot
+with the `02-secrets.yaml` placeholder env values until step 4 syncs Doppler).
+Do NOT commit the real credentials — `01-ghcr-secret.yaml` stays a placeholder
+in git.
 
 ## 4. Create the token Secret and let the operator sync
 
@@ -124,6 +175,16 @@ Keep the idle color running until the new one proves healthy.
 
 ## 8. If something is wrong
 
+- Pod stuck in `ImagePullBackOff` / `ErrImagePull` after step 3b: the
+  `ghcr-secret` is missing, still the placeholder, or the Doppler
+  `GITHUB_TOKEN` is expired / lacks `read:packages`. Check with
+  `kubectl get secret ghcr-secret -n astrolumina-staging` and
+  `kubectl get events -n astrolumina-staging --sort-by=.lastTimestamp | tail -10`.
+  Recreate the secret with the command from step 3b, then
+  `kubectl rollout restart deploy -n astrolumina-staging`. (The old Compose
+  equivalent was `echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER
+  --password-stdin` — in K8s the kubelet needs the secret, not a node-local
+docker login.)
 - `curl` returns 404 on `/api/*`: the request never matched the IngressRoute.
   Check `kubectl get ingressroute -n astrolumina-staging` and that your
   `/etc/hosts` points at a node IP (not the VM hostname).
@@ -131,5 +192,12 @@ Keep the idle color running until the new one proves healthy.
   config; sync + restart are automatic.
 - `describe dopplersecret` shows auth errors: wrong token or wrong
   `project`/`config` in `03-doppler-secrets.yaml`.
+- `kubectl get dopplersecrets -n doppler-operator-system` shows nothing:
+  first check `kubectl get dopplersecrets -A` (maybe they landed in the app
+  namespace — that means your checkout predates the kustomization namespace
+  fix; pull latest and re-apply), then confirm the operator install from
+  step 2 with `kubectl get crd dopplersecrets.secrets.doppler.com`.
+- `kubectl get secrets` / `get pods` with no `-n` only shows the `default`
+  namespace — always pass `-n astrolumina-staging` for this stack.
 - HPA `<unknown>` metrics: metrics-server is not bundled with RKE2; harmless
   for testing.

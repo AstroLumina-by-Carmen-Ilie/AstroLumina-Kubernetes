@@ -30,6 +30,8 @@ spec:
         app.kubernetes.io/component: frontend
         environment: development
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: frontend
           image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:2.0.2

@@ -34,6 +34,8 @@ spec:
         environment: production
         variant: blue
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: astrology-api
           image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:latest
