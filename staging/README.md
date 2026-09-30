@@ -23,9 +23,9 @@ the Compose staging `routes.yml`). Blue is live by default.
   the four image tags `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
   `ASTROLOGY_API_DOCKER_IMAGE_TAG` (2.0.6), `BOOKING_API_DOCKER_IMAGE_TAG`
   (2.0.5), `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6) — the exact tags pinned
-  in step 3c. Plus, before step 4, export `K8S_SERVICE_TOKEN` with the
-  service token of the `stg` config — one `export` in your shell, step 4
-  consumes it directly, no dashboard copy-paste involved.
+  in step 3c. It also holds `K8S_SERVICE_TOKEN` — the service token of the
+  `stg` config. Step 4 pulls it straight from Doppler, no dashboard
+  copy-paste anywhere.
 - The images referenced by the Deployments are private on GHCR. Every
   blue/green Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
   `01-ghcr-secret.yaml` ships as a placeholder; step 3b replaces it with
@@ -155,16 +155,19 @@ re-run. Run this again on BOTH colors every time you promote a new build.
 
 ## 4. Create the token Secret and let the operator sync
 
-The token is deliberately NOT in git. `K8S_SERVICE_TOKEN` (exported in the
-prerequisites) holds the service token for the `stg` config — consume it
-directly, no dashboard involved (idempotent, safe to re-run):
+The token is deliberately NOT in git. It already lives in Doppler as
+`K8S_SERVICE_TOKEN` (per-environment value, `stg` config) — pull it into
+your shell, then consume it (idempotent, safe to re-run):
 
 ```bash
+export K8S_SERVICE_TOKEN=$(doppler secrets get K8S_SERVICE_TOKEN --plain --project astrolumina --config stg)
 ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-stg -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'
 ```
 
-No `K8S_SERVICE_TOKEN` in this shell? Generate one without touching the
-dashboard (uses your existing Doppler CLI login):
+If `doppler secrets get K8S_SERVICE_TOKEN` ever reports the key missing
+(e.g. revoked upstream and never re-saved), mint a fresh one without
+touching the dashboard (uses your existing Doppler CLI login) and store it
+back in Doppler under the same name, so this step stays zero-paste:
 
 ```bash
 export K8S_SERVICE_TOKEN=$(doppler configs tokens create k8s-stg --project astrolumina --config stg --plain)

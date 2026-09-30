@@ -85,8 +85,10 @@ ssh "$K8S_CP_CONN" -- "kubectl apply -f https://github.com/DopplerHQ/kubernetes-
 - `03-doppler-secrets.yaml` in each environment holds the 4 `DopplerSecret`
   resources (one per managed Secret, key subsets included), so
   `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/<env>"` brings up
-everything at once. Create the token after each rebuild from
-`$K8S_SERVICE_TOKEN` (no dashboard copy-paste), e.g. for development:
+everything at once. Create the token after each rebuild from the
+`K8S_SERVICE_TOKEN` Doppler secret (fetch it like any other key, no
+dashboard copy-paste), e.g. for development:
+`export K8S_SERVICE_TOKEN=$(doppler secrets get K8S_SERVICE_TOKEN --plain --project astrolumina --config dev)` then
 `ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'`.
 - Boot order per environment: apply kustomize (placeholders) -> create token
   -> verify sync -> delete the `- 02-secrets.yaml` line from that
