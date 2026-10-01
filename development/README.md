@@ -202,13 +202,23 @@ ssh "$K8S_CP_CONN" -- "kubectl get secret env-payment-api-secrets -n astrolumina
 Expected: `sk_test_` or `sk_live_`, NOT the placeholder text. Repeat the
 spirit of this check for one key per Secret if you want to be thorough.
 
-## 5. Remove the placeholders
+## 5. Remove the placeholders (REQUIRED — and remove BOTH, not just 02)
 
-Now that Doppler owns the Secrets, stop applying the fake ones:
+Yes, this step is necessary, just not the way it was written before. As
+long as the placeholder files stay listed in `kustomization.yaml`, every
+future `apply -k` overwrites the REAL secrets with fakes: `02-secrets.yaml`
+would clobber the Doppler-synced values, and `01-ghcr-secret.yaml` would
+clobber the real pull secret — so the next rollout restart dies with
+`ImagePullBackOff` (exactly what you hit). Doppler already synced without
+any redeploy; this step just stops kustomize from ever stomping on the live
+secrets again.
 
-1. Edit `development/kustomization.yaml` and delete the
-   `- 02-secrets.yaml` line.
-2. Re-apply:
+1. Edit `development/kustomization.yaml` and delete BOTH lines:
+   `- 02-secrets.yaml` AND `- 01-ghcr-secret.yaml`.
+   (Git keeps the originals — a fresh rebuild starts from placeholders again.)
+2. If step 5 was already run the old way, the pull secret is currently the
+   placeholder: re-run step 3b FIRST to restore the real `ghcr-secret`.
+3. Re-apply:
 
 ```bash
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/development"
@@ -227,6 +237,21 @@ Find a node IP (`ssh "$K8S_CP_CONN" -- "kubectl get nodes -o wide"`), then open:
 - Astrology API: `http://<node-ip>:30301`
 - Payment API: `http://<node-ip>:30302`
 - Booking API: `http://<node-ip>:30303`
+
+The frontend will load, but its API calls will fail out of the box:
+`env.js` carries `http://astrology-api:3031`-style URLs — cluster-internal
+DNS names your laptop browser cannot resolve. They are fixed in Doppler —
+which you manage manually, so no set commands here, just the contract: the
+manifest reads the app-facing names (`ASTROLOGICAL_API_URL` /
+`PAYMENT_API_URL` / `BOOKING_API_URL`) from the `*_K8S_URL` secret keys
+(`development/10-frontend-deployment.yaml`), so make sure `dev` holds
+`ASTROLOGICAL_API_K8S_URL`, `PAYMENT_API_K8S_URL`, `BOOKING_API_K8S_URL`
+with the K8s-reachable endpoints (`http://<node-ip>:30301/30302/30303` —
+any node IP works, NodePort listens on all nodes).
+
+Watch the frontend pod roll (the `secrets.doppler.com/reload` annotation
+restarts it once the operator re-syncs), then hard-refresh the browser page
+(`env.js` is cached aggressively).
 
 ## 7. If something is wrong
 

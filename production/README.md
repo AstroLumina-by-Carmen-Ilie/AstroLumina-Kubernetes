@@ -252,10 +252,16 @@ Expected: no errors; the key starts with `sk_live_` (NOT `sk_test_`, NOT the
 placeholder). Double-check you synced the `prd` config, not `stg`: charging
 real money with test keys fails, and vice versa.
 
-## 7. Remove the placeholders
+## 7. Remove the placeholders (both files, not just 02)
 
-1. Edit `production/kustomization.yaml` and delete the `- 02-secrets.yaml` line.
-2. Re-apply and confirm the automatic restart:
+1. Edit `production/kustomization.yaml` and delete BOTH lines:
+   `- 02-secrets.yaml` AND `- 01-ghcr-secret.yaml`. Leaving either one
+   listed means the next `apply -k` overwrites a live secret with its
+   placeholder — `02` clobbers the Doppler-synced values, `01` clobbers the
+   real pull secret and the following rollout dies with `ImagePullBackOff`.
+   (Git keeps the originals — a fresh rebuild starts from placeholders again.)
+2. If this step was already run the old way, re-run step 5b FIRST to restore
+   the real `ghcr-secret`, then re-apply and confirm the automatic restart:
 
 ```bash
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"

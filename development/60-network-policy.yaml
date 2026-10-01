@@ -26,14 +26,10 @@ spec:
         - port: 3033
           protocol: TCP
     # Dev has no Traefik: NodePorts are reached directly from the LAN, so the
-    # app ports accept traffic from anywhere in this environment only.
+    # app ports accept traffic from anywhere (deliberately permissive dev).
     - from:
         - ipBlock:
             cidr: 0.0.0.0/0
-            except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
       ports:
         - port: 80
           protocol: TCP
@@ -63,10 +59,6 @@ spec:
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
-            except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
       ports:
         - port: 80
           protocol: TCP

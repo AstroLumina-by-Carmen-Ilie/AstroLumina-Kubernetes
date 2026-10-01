@@ -188,10 +188,16 @@ ssh "$K8S_CP_CONN" -- "kubectl get secret env-payment-api-secrets -n astrolumina
 Expected: no errors on `describe`; the key starts with `sk_test_` (staging
 uses test keys), not the placeholder text.
 
-## 5. Remove the placeholders
+## 5. Remove the placeholders (both files, not just 02)
 
-1. Edit `staging/kustomization.yaml` and delete the `- 02-secrets.yaml` line.
-2. Re-apply and confirm the automatic restart:
+1. Edit `staging/kustomization.yaml` and delete BOTH lines:
+   `- 02-secrets.yaml` AND `- 01-ghcr-secret.yaml`. Leaving either one
+   listed means the next `apply -k` overwrites a live secret with its
+   placeholder — `02` clobbers the Doppler-synced values, `01` clobbers the
+   real pull secret and the following rollout dies with `ImagePullBackOff`.
+   (Git keeps the originals — a fresh rebuild starts from placeholders again.)
+2. If this step was already run the old way, re-run step 3b FIRST to restore
+   the real `ghcr-secret`, then re-apply and confirm the automatic restart:
 
 ```bash
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/staging"

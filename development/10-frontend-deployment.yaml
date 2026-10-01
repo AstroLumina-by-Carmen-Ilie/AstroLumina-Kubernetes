@@ -97,17 +97,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: env-frontend-secrets
-                  key: ASTROLOGICAL_API_URL
+                  key: ASTROLOGICAL_API_K8S_URL
             - name: PAYMENT_API_URL
               valueFrom:
                 secretKeyRef:
                   name: env-frontend-secrets
-                  key: PAYMENT_API_URL
+                  key: PAYMENT_API_K8S_URL
             - name: BOOKING_API_URL
               valueFrom:
                 secretKeyRef:
                   name: env-frontend-secrets
-                  key: BOOKING_API_URL
+                  key: BOOKING_API_K8S_URL
             - name: STRIPE_PK
               valueFrom:
                 secretKeyRef:
