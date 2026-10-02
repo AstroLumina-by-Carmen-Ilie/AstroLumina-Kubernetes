@@ -5,6 +5,37 @@ Deploys into namespace `astrolumina-staging`: blue + green variants at
 single host `staging.astrolumina.ro` with `/api/*` prefix routing (mirrors
 the Compose staging `routes.yml`). Blue is live by default.
 
+## How this environment boots (read first)
+
+Everything below assumes an **empty cluster** — no operator, no secrets,
+nothing yet. The deploy works in three phases:
+
+1. **Placeholders first.** `01-ghcr-secret.yaml` (fake pull credentials)
+   and `02-secrets.yaml` (schema-exact keys, fake values) exist so the very
+   first `kubectl apply -k` succeeds on a blank cluster: namespace,
+   Deployments, Services and Secrets are all created and the pods start.
+   They cannot pull images or read real config yet — `ImagePullBackOff`
+   until step 3b is expected, not an error.
+2. **Doppler fills in the real values.** The Doppler Kubernetes operator
+   watches the `DopplerSecret` objects (`03-doppler-secrets.yaml`). Each one
+   points at one Doppler config (here: `stg`) plus a service token, and
+   declares which keys to sync into which Kubernetes Secret. Once the token
+   Secret exists, the operator overwrites the placeholder values in place
+   with the real ones and rolls the pods
+   (`secrets.doppler.com/reload` annotation) — no redeploy needed.
+   Two secrets cannot come from Doppler and are created imperatively
+   instead: `ghcr-secret` (a pull secret must be
+   `type: kubernetes.io/dockerconfigjson`, while the operator only syncs
+   `Opaque`) and the token Secret itself (the operator needs the token to
+   authenticate — chicken-and-egg).
+3. **Placeholders leave the build.** After the sync is verified, the
+   `- 01-ghcr-secret.yaml` and `- 02-secrets.yaml` lines are deleted from
+   `kustomization.yaml` (step 5). If they stayed listed, the next
+   `apply -k` would overwrite the live secrets with fakes again: `02`
+   clobbers the Doppler-synced values, `01` clobbers the real pull secret
+   and the following rollout dies with `ImagePullBackOff`. Git keeps the
+   files — a fresh rebuild starts from placeholders again.
+
 ## 0. Prerequisites (have these ready before you start)
 
 - Fresh RKE2 VMs: 1 control-plane + 2 workers, all `Ready` (you rebuild the
@@ -15,21 +46,27 @@ the Compose staging `routes.yml`). Blue is live by default.
   `ssh "$K8S_CP_CONN" -- "..."`. This repo is mounted live at `/mnt/k8s`
   on the control plane — edits you make here apply straight from there, no
   `git pull` needed on the VM.
-- In Doppler: project `astrolumina`, config `stg`, filled with EVERY
-  variable the stack needs (shared vars, frontend/API URLs with the
-  `staging.astrolumina.ro` host, `CORS_ORIGINS`, plus all secrets). It must
-  also contain `GITHUB_USER`, `GITHUB_TOKEN` (PAT with `read:packages`) and
-  `GITHUB_EMAIL` — the GHCR credentials used in step 3b. It must also contain
-  the four image tags `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
-  `ASTROLOGY_API_DOCKER_IMAGE_TAG` (2.0.6), `BOOKING_API_DOCKER_IMAGE_TAG`
-  (2.0.5), `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6) — the exact tags pinned
-  in step 3c. It also holds `K8S_SERVICE_TOKEN` — the service token of the
-  `stg` config. Step 4 pulls it straight from Doppler, no dashboard
-  copy-paste anywhere.
+- In Doppler: project `astrolumina`, config `stg`, holding the complete
+  runtime set for the stack (every key the Deployments reference — the
+  manifests plus `02-secrets.yaml` are the exact schema, so no separate
+  list is needed here). Three groups of keys take part in the setup
+  itself, and you will export each of them below:
+  - `GITHUB_USER`, `GITHUB_TOKEN` (PAT with `read:packages`) and
+    `GITHUB_EMAIL` — the GHCR pull credentials used in step 3b
+    (`dockerconfigjson` needs all three: username, password, email).
+  - `FRONTEND_DOCKER_IMAGE_TAG` (2.0.6),
+    `ASTROLOGY_API_DOCKER_IMAGE_TAG` (2.0.6),
+    `BOOKING_API_DOCKER_IMAGE_TAG` (2.0.5),
+    `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6) — the exact tags pinned in
+    step 3c.
+  - `K8S_SERVICE_TOKEN` — the service token of the `stg` config,
+    consumed in step 4. No dashboard copy-paste anywhere: every value
+    below comes from `doppler secrets get`.
 - The images referenced by the Deployments are private on GHCR. Every
   blue/green Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
   `01-ghcr-secret.yaml` ships as a placeholder; step 3b replaces it with
-  the real secret built from the Doppler `GITHUB_USER` / `GITHUB_TOKEN`.
+  the real secret built from the Doppler `GITHUB_USER` / `GITHUB_TOKEN` /
+  `GITHUB_EMAIL`.
 
 ## 1. Connect to the control plane (laptop → CP)
 
@@ -144,9 +181,6 @@ unset FRONTEND_TAG ASTROLOGY_TAG BOOKING_TAG PAYMENT_TAG
 ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-staging"
 ```
 
-Without the Doppler CLI, copy the 4 values from the dashboard and substitute
-them for the `$..._TAG` variables above.
-
 Expected: all 8 Deployments restart on the exact tags from Doppler
 (`ssh "$K8S_CP_CONN" -- "kubectl describe deploy/frontend-blue -n astrolumina-staging | grep Image:"`
 shows `:2.0.6`). If a pod reports `ErrImagePull` with `manifest unknown`,
@@ -188,16 +222,19 @@ ssh "$K8S_CP_CONN" -- "kubectl get secret env-payment-api-secrets -n astrolumina
 Expected: no errors on `describe`; the key starts with `sk_test_` (staging
 uses test keys), not the placeholder text.
 
-## 5. Remove the placeholders (both files, not just 02)
+## 5. Remove the placeholders (REQUIRED — BOTH files)
 
-1. Edit `staging/kustomization.yaml` and delete BOTH lines:
-   `- 02-secrets.yaml` AND `- 01-ghcr-secret.yaml`. Leaving either one
-   listed means the next `apply -k` overwrites a live secret with its
-   placeholder — `02` clobbers the Doppler-synced values, `01` clobbers the
-   real pull secret and the following rollout dies with `ImagePullBackOff`.
-   (Git keeps the originals — a fresh rebuild starts from placeholders again.)
-2. If this step was already run the old way, re-run step 3b FIRST to restore
-   the real `ghcr-secret`, then re-apply and confirm the automatic restart:
+As long as the placeholder files stay listed in `kustomization.yaml`, every
+future `apply -k` overwrites the REAL secrets with fakes: `02-secrets.yaml`
+would clobber the Doppler-synced values, and `01-ghcr-secret.yaml` would
+clobber the real pull secret — so the next rollout restart dies with
+`ImagePullBackOff`. Doppler already synced without any redeploy; this step
+just stops kustomize from ever stomping on the live secrets again.
+
+Edit `staging/kustomization.yaml` and delete BOTH lines:
+`- 02-secrets.yaml` AND `- 01-ghcr-secret.yaml`.
+(Git keeps the originals — a fresh rebuild starts from placeholders again.)
+Then re-apply:
 
 ```bash
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/staging"
@@ -261,10 +298,7 @@ Keep the idle color running until the new one proves healthy.
   `ssh "$K8S_CP_CONN" -- "kubectl get secret ghcr-secret -n astrolumina-staging"`
   and `ssh "$K8S_CP_CONN" -- "kubectl get events -n astrolumina-staging --sort-by=.lastTimestamp | tail -10"`.
   Recreate the secret with the command from step 3b, then
-  `ssh "$K8S_CP_CONN" -- "kubectl rollout restart deploy -n astrolumina-staging"`. (The old Compose
-  equivalent was `echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER
-  --password-stdin` — in K8s the kubelet needs the secret, not a node-local
-docker login.)
+  `ssh "$K8S_CP_CONN" -- "kubectl rollout restart deploy -n astrolumina-staging"`.
 - `curl` returns 404 on `/api/*`: the request never matched the IngressRoute.
   Check `ssh "$K8S_CP_CONN" -- "kubectl get ingressroute -n astrolumina-staging"`
   and that your `/etc/hosts` points at a node IP (not the VM hostname).
@@ -273,10 +307,11 @@ docker login.)
 - `describe dopplersecret` shows auth errors: wrong token or wrong
   `project`/`config` in `03-doppler-secrets.yaml`.
 - `ssh "$K8S_CP_CONN" -- "kubectl get dopplersecrets -n doppler-operator-system"`
-  shows nothing: first check with `-A` (maybe they landed in the app
-  namespace — that means your checkout predates the kustomization namespace
-  fix; pull latest and re-apply), then confirm the operator install from
-  step 2 (`ssh "$K8S_CP_CONN" -- "kubectl get crd dopplersecrets.secrets.doppler.com"`).
+  shows nothing: the operator install from step 2 did not complete
+  (confirm with `ssh "$K8S_CP_CONN" -- "kubectl get crd dopplersecrets.secrets.doppler.com"`),
+  or the token Secret is missing or misnamed — the DopplerSecrets must land
+  in `doppler-operator-system` (re-run the check with `-A` to see which
+  namespace yours went to).
 - `kubectl get secrets` / `get pods` with no `-n` only shows the `default`
   namespace — always pass `-n astrolumina-staging` for this stack.
 - HPA `<unknown>` metrics: metrics-server is not bundled with RKE2; harmless

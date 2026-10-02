@@ -7,6 +7,37 @@ ports are published and no Traefik exists).
 NodePorts: frontend `30080`, astrology `30301`, payment `30302`,
 booking `30303`.
 
+## How this environment boots (read first)
+
+Everything below assumes an **empty cluster** — no operator, no secrets,
+nothing yet. The deploy works in three phases:
+
+1. **Placeholders first.** `01-ghcr-secret.yaml` (fake pull credentials)
+   and `02-secrets.yaml` (schema-exact keys, fake values) exist so the very
+   first `kubectl apply -k` succeeds on a blank cluster: namespace,
+   Deployments, Services and Secrets are all created and the pods start.
+   They cannot pull images or read real config yet — `ImagePullBackOff`
+   until step 3b is expected, not an error.
+2. **Doppler fills in the real values.** The Doppler Kubernetes operator
+   watches the `DopplerSecret` objects (`03-doppler-secrets.yaml`). Each one
+   points at one Doppler config (here: `dev`) plus a service token, and
+   declares which keys to sync into which Kubernetes Secret. Once the token
+   Secret exists, the operator overwrites the placeholder values in place
+   with the real ones and rolls the pods
+   (`secrets.doppler.com/reload` annotation) — no redeploy needed.
+   Two secrets cannot come from Doppler and are created imperatively
+   instead: `ghcr-secret` (a pull secret must be
+   `type: kubernetes.io/dockerconfigjson`, while the operator only syncs
+   `Opaque`) and the token Secret itself (the operator needs the token to
+   authenticate — chicken-and-egg).
+3. **Placeholders leave the build.** After the sync is verified, the
+   `- 01-ghcr-secret.yaml` and `- 02-secrets.yaml` lines are deleted from
+   `kustomization.yaml` (step 5). If they stayed listed, the next
+   `apply -k` would overwrite the live secrets with fakes again: `02`
+   clobbers the Doppler-synced values, `01` clobbers the real pull secret
+   and the following rollout dies with `ImagePullBackOff`. Git keeps the
+   files — a fresh rebuild starts from placeholders again.
+
 ## 0. Prerequisites (have these ready before you start)
 
 - RKE2 VMs up: 1 control-plane + 2 workers, all `Ready`.
@@ -16,25 +47,25 @@ booking `30303`.
   `ssh "$K8S_CP_CONN" -- "..."`. This repo is mounted live at `/mnt/k8s`
   on the control plane — edits you make here apply straight from there, no
   `git pull` needed on the VM.
-- In Doppler: project `astrolumina`, config `dev`, filled with EVERY
-  variable the stack needs — not just secrets, but also the former ConfigMap
-  values: `NODE_ENV`, all `*_SERVER_PORT` / `*_SERVER_DNS`,
-  `ASTROLOGICAL_API_URL`, `PAYMENT_API_URL`, `BOOKING_API_URL`, `STRIPE_PK`,
-  `R2_BASE_URL`, `ASTROLOGER_API_URL/HOST`, `CALCOM_BASE_URL`,
-  `STRIPE_API_VER`, `CORS_ORIGINS`. Browser-facing URLs must contain the real
-  node IP (no `NODE_IP` placeholder works at runtime — resolve the IP first,
-  put the final URLs in Doppler). It must also contain `GITHUB_USER`,
-  `GITHUB_TOKEN` (PAT with `read:packages`) and `GITHUB_EMAIL` — the GHCR
-  credentials used in step 3b. It must also contain the four image tags
-  `FRONTEND_DOCKER_IMAGE_TAG`, `ASTROLOGY_API_DOCKER_IMAGE_TAG`,
-  `BOOKING_API_DOCKER_IMAGE_TAG`, `PAYMENT_API_DOCKER_IMAGE_TAG` (all
-  `latest` for dev — the exact tags pinned in step 3c). It also holds
-  `K8S_SERVICE_TOKEN` — the service token of the `dev` config. Step 4 pulls
-  it straight from Doppler, no dashboard copy-paste anywhere.
+- In Doppler: project `astrolumina`, config `dev`, holding the complete
+  runtime set for the stack (every key the Deployments reference — the
+  manifests plus `02-secrets.yaml` are the exact schema, so no separate
+  list is needed here). Three groups of keys take part in the setup
+  itself, and you will export each of them below:
+  - `GITHUB_USER`, `GITHUB_TOKEN` (PAT with `read:packages`) and
+    `GITHUB_EMAIL` — the GHCR pull credentials used in step 3b
+    (`dockerconfigjson` needs all three: username, password, email).
+  - `FRONTEND_DOCKER_IMAGE_TAG`, `ASTROLOGY_API_DOCKER_IMAGE_TAG`,
+    `BOOKING_API_DOCKER_IMAGE_TAG`, `PAYMENT_API_DOCKER_IMAGE_TAG`
+    (all `latest` for dev) — the exact tags pinned in step 3c.
+  - `K8S_SERVICE_TOKEN` — the service token of the `dev` config,
+    consumed in step 4. No dashboard copy-paste anywhere: every value
+    below comes from `doppler secrets get`.
 - The images referenced by the Deployments are private on GHCR. Every
   Deployment references `imagePullSecrets: [{name: ghcr-secret}]`.
   `01-ghcr-secret.yaml` ships as a placeholder; step 3b replaces it with
-  the real secret built from the Doppler `GITHUB_USER` / `GITHUB_TOKEN`.
+  the real secret built from the Doppler `GITHUB_USER` / `GITHUB_TOKEN` /
+  `GITHUB_EMAIL`.
 
 ## 1. Connect to the control plane (laptop → CP)
 
@@ -148,11 +179,11 @@ ssh "$K8S_CP_CONN" -- "kubectl set image deploy/booking-api booking-api=ghcr.io/
 ssh "$K8S_CP_CONN" -- "kubectl set image deploy/payment-api payment-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:$PAYMENT_TAG -n astrolumina-dev"
 unset FRONTEND_TAG ASTROLOGY_TAG BOOKING_TAG PAYMENT_TAG
 ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/frontend -n astrolumina-dev"
+ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/astrology-api -n astrolumina-dev"
+ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/booking-api -n astrolumina-dev"
+ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/payment-api -n astrolumina-dev"
 ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-dev"
 ```
-
-Without the Doppler CLI, copy the 4 values from the dashboard and substitute
-them for the `$..._TAG` variables above.
 
 Expected: the Deployments restart on the exact tags from Doppler
 (`ssh "$K8S_CP_CONN" -- "kubectl describe deploy/frontend -n astrolumina-dev | grep Image:"`
@@ -202,23 +233,19 @@ ssh "$K8S_CP_CONN" -- "kubectl get secret env-payment-api-secrets -n astrolumina
 Expected: `sk_test_` or `sk_live_`, NOT the placeholder text. Repeat the
 spirit of this check for one key per Secret if you want to be thorough.
 
-## 5. Remove the placeholders (REQUIRED — and remove BOTH, not just 02)
+## 5. Remove the placeholders (REQUIRED — BOTH files)
 
-Yes, this step is necessary, just not the way it was written before. As
-long as the placeholder files stay listed in `kustomization.yaml`, every
+As long as the placeholder files stay listed in `kustomization.yaml`, every
 future `apply -k` overwrites the REAL secrets with fakes: `02-secrets.yaml`
 would clobber the Doppler-synced values, and `01-ghcr-secret.yaml` would
 clobber the real pull secret — so the next rollout restart dies with
-`ImagePullBackOff` (exactly what you hit). Doppler already synced without
-any redeploy; this step just stops kustomize from ever stomping on the live
-secrets again.
+`ImagePullBackOff`. Doppler already synced without any redeploy; this step
+just stops kustomize from ever stomping on the live secrets again.
 
-1. Edit `development/kustomization.yaml` and delete BOTH lines:
-   `- 02-secrets.yaml` AND `- 01-ghcr-secret.yaml`.
-   (Git keeps the originals — a fresh rebuild starts from placeholders again.)
-2. If step 5 was already run the old way, the pull secret is currently the
-   placeholder: re-run step 3b FIRST to restore the real `ghcr-secret`.
-3. Re-apply:
+Edit `development/kustomization.yaml` and delete BOTH lines:
+`- 02-secrets.yaml` AND `- 01-ghcr-secret.yaml`.
+(Git keeps the originals — a fresh rebuild starts from placeholders again.)
+Then re-apply:
 
 ```bash
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/development"
@@ -240,14 +267,14 @@ Find a node IP (`ssh "$K8S_CP_CONN" -- "kubectl get nodes -o wide"`), then open:
 
 The frontend will load, but its API calls will fail out of the box:
 `env.js` carries `http://astrology-api:3031`-style URLs — cluster-internal
-DNS names your laptop browser cannot resolve. They are fixed in Doppler —
-which you manage manually, so no set commands here, just the contract: the
-manifest reads the app-facing names (`ASTROLOGICAL_API_URL` /
-`PAYMENT_API_URL` / `BOOKING_API_URL`) from the `*_K8S_URL` secret keys
-(`development/10-frontend-deployment.yaml`), so make sure `dev` holds
-`ASTROLOGICAL_API_K8S_URL`, `PAYMENT_API_K8S_URL`, `BOOKING_API_K8S_URL`
-with the K8s-reachable endpoints (`http://<node-ip>:30301/30302/30303` —
-any node IP works, NodePort listens on all nodes).
+DNS names your laptop browser cannot resolve. They are fixed in Doppler.
+The contract is: the manifest reads the app-facing names
+(`ASTROLOGICAL_API_URL` / `PAYMENT_API_URL` / `BOOKING_API_URL`) from the
+`*_K8S_URL` secret keys (`development/10-frontend-deployment.yaml`), so the
+`dev` config must hold `ASTROLOGICAL_API_K8S_URL`, `PAYMENT_API_K8S_URL`,
+`BOOKING_API_K8S_URL` with the K8s-reachable endpoints
+(`http://<node-ip>:30301/30302/30303` — any node IP works, NodePort
+listens on all nodes).
 
 Watch the frontend pod roll (the `secrets.doppler.com/reload` annotation
 restarts it once the operator re-syncs), then hard-refresh the browser page
@@ -261,10 +288,7 @@ restarts it once the operator re-syncs), then hard-refresh the browser page
   `ssh "$K8S_CP_CONN" -- "kubectl get secret ghcr-secret -n astrolumina-dev"`
   and `ssh "$K8S_CP_CONN" -- "kubectl get events -n astrolumina-dev --sort-by=.lastTimestamp | tail -10"`.
   Recreate the secret with the command from step 3b, then
-  `ssh "$K8S_CP_CONN" -- "kubectl rollout restart deploy -n astrolumina-dev"`. (The old Compose
-  equivalent was `echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER
-  --password-stdin` — in K8s the kubelet needs the secret, not a node-local
-docker login.)
+  `ssh "$K8S_CP_CONN" -- "kubectl rollout restart deploy -n astrolumina-dev"`.
 - Pod `CrashLoopBackOff` with a "missing environment variable" log: the
   Doppler `dev` config lacks that key. Add it in Doppler, the operator syncs
   within seconds and restarts the pods by itself.
@@ -272,10 +296,11 @@ docker login.)
   service token or a wrong `project`/`config` name. Fix and re-apply, or
   recreate the token Secret (delete + `kubectl create secret ...` again).
 - `ssh "$K8S_CP_CONN" -- "kubectl get dopplersecrets -n doppler-operator-system"`
-  shows nothing: first check with `-A` (maybe they landed in the app
-  namespace — that means your checkout predates the kustomization namespace
-  fix; pull latest and re-apply), then confirm the operator install from
-  step 2 (`ssh "$K8S_CP_CONN" -- "kubectl get crd dopplersecrets.secrets.doppler.com"`).
+  shows nothing: the operator install from step 2 did not complete
+  (confirm with `ssh "$K8S_CP_CONN" -- "kubectl get crd dopplersecrets.secrets.doppler.com"`),
+  or the token Secret is missing or misnamed — the DopplerSecrets must land
+  in `doppler-operator-system` (re-run the check with `-A` to see which
+  namespace yours went to).
 - `kubectl get secrets` / `get pods` with no `-n` only shows the `default`
   namespace — always pass `-n astrolumina-dev` for this stack.
 - NodePort unreachable from your machine: the VMs' firewall is the usual

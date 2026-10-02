@@ -49,15 +49,14 @@ and what to check when a step fails.
 - **The 4-line switch**: live traffic is the 4 `selector: variant:` fields in
   `53-live-services.yaml`. Flip `blue` to `green` and re-apply to cut over.
 - **Frontend env injection**: the frontend image reads `public/env.js`
-  placeholders filled by Compose-style variables (`ASTROLOGICAL_API_URL`,
-  `STRIPE_PK`, `*_SERVER_DNS/PORT`, `FRONTEND_SENTRY_DSN`, `R2_BASE_URL`),
-  not `VITE_*`. Those variables live in Doppler and are synced into the
-  `env-frontend-secrets` Secret, exactly like every other variable.
+  placeholders filled by runtime variables (e.g. `ASTROLOGICAL_API_URL`,
+  `STRIPE_PK`), not `VITE_*`. Those variables live in Doppler and are
+  synced into the `env-frontend-secrets` Secret, exactly like every other
+  variable.
 - **Backend env contract**: the APIs validate their full env set at startup
-  (zod, exit 1 if missing), so every Deployment wires all 9 shared vars
-  (`NODE_ENV`, `*_SERVER_PORT/DNS` x4) plus its service keys — all via
-  `secretKeyRef` into the service's Doppler-managed Secret. There are no
-  ConfigMaps left: 100% of variables come from Doppler.
+  (zod, exit 1 if missing), so every Deployment wires its complete env set
+  via `secretKeyRef` into the service's Doppler-managed Secret. 100% of
+  variables come from Doppler — there are no ConfigMaps.
 
 ## Secrets and Doppler
 
@@ -91,15 +90,14 @@ dashboard copy-paste), e.g. for development:
 `export K8S_SERVICE_TOKEN=$(doppler secrets get K8S_SERVICE_TOKEN --plain --project astrolumina --config dev)` then
 `ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'`.
 - Boot order per environment: apply kustomize (placeholders) -> create token
-  -> verify sync -> delete the `- 02-secrets.yaml` line from that
-  environment's `kustomization.yaml` -> re-apply. Full command sequences with
-  expected outputs live in each environment's `README.md`.
-- Doppler must provide literally every variable the Deployments reference
-  via `secretKeyRef` — shared vars (`NODE_ENV`, `*_SERVER_PORT/DNS`,
-  `CORS_ORIGINS`), frontend runtime URLs, per-service URLs, plus all secrets
-  (Sentry DSNs, API keys, Stripe keys, price IDs, R2/D1 credentials). If a
-  single key is missing from the Doppler config, the pod fails at startup
-  (zod validation, exit 1) and the fix is always "add the key in Doppler".
+  -> verify sync -> delete the `- 01-ghcr-secret.yaml` and `- 02-secrets.yaml`
+  lines from that environment's `kustomization.yaml` -> re-apply. Full command
+  sequences with expected outputs live in each environment's `README.md`.
+- Doppler must provide every variable the Deployments reference
+  via `secretKeyRef` — the manifests plus `02-secrets.yaml` define the exact
+  schema. If a single key is missing from the Doppler config, the pod fails
+  at startup (zod validation, exit 1) and the fix is always "add the key
+  in Doppler".
   Deployments carry the `secrets.doppler.com/reload` annotation, so pods
   restart automatically whenever a synced value changes.
 
