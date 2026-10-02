@@ -1,0 +1,77 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: astrolumina-network-policy
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: astrolumina
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: astrolumina-prod
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 3031
+        - protocol: TCP
+          port: 3032
+        - protocol: TCP
+          port: 3033
+    # RKE2 ships Traefik in kube-system (there is no ingress-nginx here), so
+    # cluster ingress comes from Traefik pods in that namespace.
+    # NOTE: no podSelector here on purpose. RKE2 Traefik pods are managed
+    # by Helm and don't carry our labels — selecting on them would match
+    # nothing and ingress would die.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 3031
+        - protocol: TCP
+          port: 3032
+        - protocol: TCP
+          port: 3033
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: astrolumina-prod
+    # CoreDNS (kube-system) for name resolution, public HTTP(S) for the
+    # third-party APIs (RapidAPI, Cal.com, Stripe, Sentry, Cloudflare).
+    # NOTE: no podSelector here on purpose (see Traefik rule above) — the
+    # RKE2 CoreDNS pods don't carry our labels either.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

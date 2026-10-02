@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: astrolumina-staging
+  labels:
+    name: astrolumina-staging
+    environment: staging
+    app.kubernetes.io/part-of: astrolumina

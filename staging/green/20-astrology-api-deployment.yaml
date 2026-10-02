@@ -1,0 +1,165 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: astrology-api-green
+  namespace: astrolumina-staging
+  # Let the Doppler operator restart the pods automatically when a synced secret changes.
+  annotations:
+    secrets.doppler.com/reload: "true"
+  labels:
+    app.kubernetes.io/name: astrology-api
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: astrology-api
+    environment: staging
+    variant: green
+spec:
+  # 3 replicas to mirror the Compose staging green service.
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: astrology-api
+      app.kubernetes.io/component: astrology-api
+      variant: green
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: astrology-api
+        app.kubernetes.io/part-of: astrolumina
+        app.kubernetes.io/component: astrology-api
+        environment: staging
+        variant: green
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: astrology-api
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3031
+              protocol: TCP
+          # Full variable set from src/config/env.ts: the app exits at startup
+          # if any required variable is missing, so every validated name must
+          # be wired here (PORT alone is not read by the app).
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: NODE_ENV
+            - name: FRONTEND_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: FRONTEND_SERVER_PORT
+            - name: FRONTEND_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: FRONTEND_SERVER_DNS
+            - name: ASTROLOGY_API_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: ASTROLOGY_API_SERVER_PORT
+            - name: ASTROLOGY_API_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: ASTROLOGY_API_SERVER_DNS
+            - name: BOOKING_API_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: BOOKING_API_SERVER_PORT
+            - name: BOOKING_API_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: BOOKING_API_SERVER_DNS
+            - name: PAYMENT_API_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: PAYMENT_API_SERVER_PORT
+            - name: PAYMENT_API_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: PAYMENT_API_SERVER_DNS
+            - name: FRONTEND_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: FRONTEND_SERVER_K8S_PORT
+            - name: ASTROLOGY_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: ASTROLOGY_API_SERVER_K8S_PORT
+            - name: BOOKING_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: BOOKING_API_SERVER_K8S_PORT
+            - name: PAYMENT_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: PAYMENT_API_SERVER_K8S_PORT
+            - name: CORS_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: CORS_ORIGINS
+                  optional: true
+            - name: ASTROLOGER_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: ASTROLOGER_API_URL
+            - name: ASTROLOGER_API_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: ASTROLOGER_API_HOST
+            - name: ASTROLOGER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: ASTROLOGER_API_KEY
+            - name: ASTROLOGY_API_SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: env-astrology-api-secrets
+                  key: ASTROLOGY_API_SENTRY_DSN
+          resources:
+            requests:
+              cpu: 125m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 2
+      restartPolicy: Always
