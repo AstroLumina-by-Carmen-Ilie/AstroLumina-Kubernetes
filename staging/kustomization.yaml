@@ -19,6 +19,8 @@ resources:
   - blue
   - green
 
-commonLabels:
-  app.kubernetes.io/managed-by: kustomize
-  app.kubernetes.io/part-of: astrolumina
+# NOTE: intentionally no commonLabels here (kustomize warns it is deprecated
+# anyway). All selector-relevant labels (part-of, variant) are hardcoded in
+# the manifests; the transformer additionally injected labels into
+# NetworkPolicy peers and Deployment selectors, breaking DNS/ingress and
+# making selector updates immutable.

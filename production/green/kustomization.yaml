@@ -15,7 +15,4 @@ resources:
   - 40-payment-api-deployment.yaml
   - 41-payment-api-service.yaml
 
-commonLabels:
-  app.kubernetes.io/managed-by: kustomize
-  app.kubernetes.io/part-of: astrolumina
-  variant: green
+# NOTE: intentionally no commonLabels here (see root kustomization).

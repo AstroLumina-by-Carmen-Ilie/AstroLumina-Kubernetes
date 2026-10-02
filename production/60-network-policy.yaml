@@ -29,13 +29,13 @@ spec:
           port: 3033
     # RKE2 ships Traefik in kube-system (there is no ingress-nginx here), so
     # cluster ingress comes from Traefik pods in that namespace.
+    # NOTE: no podSelector here on purpose. RKE2 Traefik pods are managed
+    # by Helm and don't carry our labels — selecting on them would match
+    # nothing and ingress would die.
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: rke2-traefik
       ports:
         - protocol: TCP
           port: 80
@@ -52,13 +52,12 @@ spec:
               kubernetes.io/metadata.name: astrolumina-prod
     # CoreDNS (kube-system) for name resolution, public HTTP(S) for the
     # third-party APIs (RapidAPI, Cal.com, Stripe, Sentry, Cloudflare).
+    # NOTE: no podSelector here on purpose (see Traefik rule above) — the
+    # RKE2 CoreDNS pods don't carry our labels either.
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
       ports:
         - port: 53
           protocol: UDP
