@@ -1,0 +1,168 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-blue
+  namespace: astrolumina-staging
+  # Let the Doppler operator restart the pods automatically when a synced secret changes.
+  annotations:
+    secrets.doppler.com/reload: "true"
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: frontend
+    environment: staging
+    variant: blue
+spec:
+  # 3 replicas to mirror the Compose staging blue service.
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+      app.kubernetes.io/component: frontend
+      variant: blue
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/part-of: astrolumina
+        app.kubernetes.io/component: frontend
+        environment: staging
+        variant: blue
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: frontend
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          # The image entrypoint injects these Compose-style variables into
+          # public/env.js at container start. VITE_* names are NOT read.
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: NODE_ENV
+            - name: FRONTEND_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SERVER_PORT
+            - name: FRONTEND_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SERVER_DNS
+            - name: ASTROLOGY_API_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_SERVER_PORT
+            - name: ASTROLOGY_API_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_SERVER_DNS
+            - name: BOOKING_API_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_SERVER_PORT
+            - name: BOOKING_API_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_SERVER_DNS
+            - name: PAYMENT_API_SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_SERVER_PORT
+            - name: PAYMENT_API_SERVER_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_SERVER_DNS
+            - name: FRONTEND_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SERVER_K8S_PORT
+            - name: ASTROLOGY_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_SERVER_K8S_PORT
+            - name: BOOKING_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_SERVER_K8S_PORT
+            - name: PAYMENT_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_SERVER_K8S_PORT
+            - name: FRONTEND_SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SENTRY_DSN
+            - name: ASTROLOGICAL_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGICAL_API_K8S_URL
+            - name: PAYMENT_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_K8S_URL
+            - name: BOOKING_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_K8S_URL
+            - name: STRIPE_PK
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: STRIPE_PK
+            - name: R2_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: R2_BASE_URL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 2
+      restartPolicy: Always

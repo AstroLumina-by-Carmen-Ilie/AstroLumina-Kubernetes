@@ -1,0 +1,93 @@
+---
+# Stable LIVE endpoints for the IngressRoute. The blue-green switch is exactly
+# these 4 selectors: flip variant blue <-> green to move traffic. This replaces
+# the 4 `service:` fields in the Compose traefik/dynamic/routes.yml and the
+# old trio of conflicting Ingress objects (blue + green + active on the same
+# hosts), which routed traffic to both colors non-deterministically.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-live
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: frontend
+    environment: production
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: frontend
+    variant: blue # LIVE: flip to green to switch traffic
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: astrology-api-live
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/name: astrology-api
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: astrology-api
+    environment: production
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3031
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: astrology-api
+    app.kubernetes.io/component: astrology-api
+    variant: blue # LIVE: flip to green to switch traffic
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-api-live
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/name: booking-api
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: booking-api
+    environment: production
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3033
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: booking-api
+    app.kubernetes.io/component: booking-api
+    variant: blue # LIVE: flip to green to switch traffic
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api-live
+  namespace: astrolumina-prod
+  labels:
+    app.kubernetes.io/name: payment-api
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: payment-api
+    environment: production
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3032
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: payment-api
+    app.kubernetes.io/component: payment-api
+    variant: blue # LIVE: flip to green to switch traffic

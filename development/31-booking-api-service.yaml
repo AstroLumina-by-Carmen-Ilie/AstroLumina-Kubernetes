@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-api
+  namespace: astrolumina-dev
+  labels:
+    app.kubernetes.io/name: booking-api
+    app.kubernetes.io/part-of: astrolumina
+    app.kubernetes.io/component: booking-api
+    environment: development
+spec:
+  # NodePort so the laptop browser can call the API at <node-ip>:30303.
+  type: NodePort
+  ports:
+    - name: http
+      port: 3033
+      targetPort: http
+      nodePort: 30303
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: booking-api
+    app.kubernetes.io/component: booking-api

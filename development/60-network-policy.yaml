@@ -1,0 +1,66 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: astrolumina-dev
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: development
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Pod-to-pod traffic inside the namespace (health, service mesh, DNS via
+    # the node-local resolver is covered by the egress rule below).
+    - from:
+        - podSelector: {}
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 3031
+          protocol: TCP
+        - port: 3032
+          protocol: TCP
+        - port: 3033
+          protocol: TCP
+    # Dev has no Traefik: NodePorts are reached directly from the LAN, so the
+    # app ports accept traffic from anywhere (deliberately permissive dev).
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 3031
+          protocol: TCP
+        - port: 3032
+          protocol: TCP
+        - port: 3033
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector: {}
+    # CoreDNS (kube-system) for name resolution, public HTTP(S) for the
+    # third-party APIs (RapidAPI, Cal.com, Stripe, Sentry, Cloudflare).
+    # NOTE: no podSelector here on purpose — the RKE2 CoreDNS pods don't
+    # carry our labels, so selecting on them would match nothing and all
+    # pod DNS would break.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP

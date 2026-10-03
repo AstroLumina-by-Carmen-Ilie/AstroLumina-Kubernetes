@@ -1,0 +1,104 @@
+---
+# Single-host routing for production, mirroring the Compose routers: one host
+# (production.k8s.astrolumina.ro), /api/* prefixes stripped before the apps, HTTPS on
+# entryPoint websecure with the letsencrypt certResolver (same email, same
+# httpChallenge as the Compose production Traefik static config). Port 80 only
+# redirects to HTTPS. Traffic goes to the *-live Services; the blue-green
+# switch flips the 4 selectors in 53-live-services.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: astrolumina
+  namespace: astrolumina-prod
+  # RKE2 Traefik only processes IngressRoutes carrying this class
+  # (--providers.kubernetescrd.ingressClass=traefik); without it the route
+  # is silently ignored and every request 404s. NOTE: the installed CRD
+  # schema has no spec.ingressClassName field, so the (deprecated but still
+  # honored) annotation is used instead.
+  annotations:
+    kubernetes.io/ingress.class: traefik
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`production.k8s.astrolumina.ro`)
+      kind: Rule
+      middlewares:
+        - name: to-https
+      services:
+        - name: noop@internal
+          kind: TraefikService
+    - match: Host(`production.k8s.astrolumina.ro`) && PathPrefix(`/api/astrology`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+        - name: strip-astrology
+      services:
+        - name: astrology-api-live
+          port: 3031
+    - match: Host(`production.k8s.astrolumina.ro`) && PathPrefix(`/api/booking`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+        - name: strip-booking
+      services:
+        - name: booking-api-live
+          port: 3033
+    - match: Host(`production.k8s.astrolumina.ro`) && PathPrefix(`/api/payment`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+        - name: strip-payment
+      services:
+        - name: payment-api-live
+          port: 3032
+    - match: Host(`production.k8s.astrolumina.ro`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+        - name: compress
+      services:
+        - name: frontend-live
+          port: 80
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: production.k8s.astrolumina.ro
+---
+# NOTE: the dashboard host is claimed here only on entryPoint websecure
+# (HTTPS); the plain-HTTP twin lives in staging/52-ingressroute.yaml.
+# Same DNS name, different entryPoints — no Traefik conflict.
+# Production dashboard (mirrors the Compose dashboard router with basic auth).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: astrolumina-prod
+  # Same ingressClass requirement as above (see NOTE on the main route).
+  annotations:
+    kubernetes.io/ingress.class: traefik
+  labels:
+    app.kubernetes.io/part-of: astrolumina
+    environment: production
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`dashboard.k8s.astrolumina.ro`)
+      kind: Rule
+      middlewares:
+        - name: dashboard-auth
+      services:
+        - name: api@internal
+          kind: TraefikService
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: dashboard.k8s.astrolumina.ro
