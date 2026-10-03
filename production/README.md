@@ -142,20 +142,23 @@ Traefik will serve its default self-signed cert instead (browser warning,
 it for a working certificate setup. For a real certificate, point real DNS
 at the node and re-apply.
 
-## 3. Set the dashboard password (REQUIRED, before first apply)
+## 3. Create the namespace + dashboard password Secret (REQUIRED, before first apply)
 
-`54-dashboard-auth-secret.yaml` ships with a placeholder. Generate the real
-hash on your LAPTOP (needs the `htpasswd` binary; `apt install apache2-utils`
-on Debian), then edit the local file — the CP sees it live at `/mnt/k8s`:
+There is no dashboard password file in git at all — the Secret is created
+purely imperatively (like `ghcr-secret`). The real hash already lives in
+Doppler as
+`TRAEFIK_DASHBOARD_AUTH` (`prd` config, full `admin:$2y$...` line). The
+`astrolumina-prod` namespace does not exist yet at this point (it is normally
+created by `apply -k` in step 5), so create it explicitly first — re-applying
+it later via `apply -k` is harmless:
 
 ```bash
-htpasswd -nbB admin '<choose-a-strong-password>'
+ssh "$K8S_CP_CONN" -- "kubectl apply -f /mnt/k8s/production/00-namespace.yaml"
+export TRAEFIK_DASHBOARD_AUTH=$(doppler secrets get TRAEFIK_DASHBOARD_AUTH --plain --project astrolumina --config prd)
+ESCAPED_AUTH=${TRAEFIK_DASHBOARD_AUTH//\$/\\\$}
+ssh "$K8S_CP_CONN" -- 'kubectl create secret generic traefik-dashboard-auth -n astrolumina-prod --from-literal=users='"$ESCAPED_AUTH"' --dry-run=client -o yaml | kubectl apply -f -'
+unset ESCAPED_AUTH TRAEFIK_DASHBOARD_AUTH
 ```
-
-Copy the whole `admin:$2y$...` output line and paste it as the `users:` value
-in `production/54-dashboard-auth-secret.yaml`, replacing
-`REPLACE_WITH_HTPASSWD_LINE_FOR_DASHBOARD`. Do NOT commit the real hash if
-this repo is shared; inject it at deploy time instead.
 
 ## 4. Install the Doppler operator (once per cluster rebuild)
 
@@ -167,7 +170,7 @@ ssh "$K8S_CP_CONN" -- "kubectl get crd dopplersecrets.secrets.doppler.com"
 
 Expected: deployment `Available`, CRD exists.
 
-## 5. Deploy production (placeholders first, real dashboard hash)
+## 5. Deploy production (placeholders first)
 
 ```bash
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"
@@ -355,9 +358,10 @@ re-run the step 8 checks.
 - Browser cert warning on a supposedly public setup: LE never issued.
   Check Traefik logs for ACME errors (usually port 80 not publicly
   reachable, or wrong email/rate limits). See the IMPORTANT note in step 2.
-- Dashboard asks for password forever / 401: the `users:` hash in
-  `54-dashboard-auth-secret.yaml` is still the placeholder or was pasted
-  with extra whitespace. Fix, re-apply, restart Traefik pod.
+- Dashboard asks for password forever / 401: the live `users:` value was
+  created from a $-mangled hash (unquoted `$2`/`$05`/… expansion somewhere
+  along the way). Re-run step 3 exactly as written — including the
+  `ESCAPED_AUTH` line — then restart the Traefik pod.
 - Pod `CrashLoopBackOff` with missing env: add the key to the Doppler `prd`
   config; sync + restart are automatic.
 - `ssh "$K8S_CP_CONN" -- "kubectl get dopplersecrets -n doppler-operator-system"`

@@ -14,7 +14,6 @@ resources:
   - 51-middlewares.yaml
   - 52-ingressroute.yaml
   - 53-live-services.yaml
-  - 54-dashboard-auth-secret.yaml
   - 60-network-policy.yaml
   - 70-hpa.yaml
   - blue
