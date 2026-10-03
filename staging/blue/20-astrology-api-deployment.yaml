@@ -141,11 +141,11 @@ spec:
                   key: ASTROLOGY_API_SENTRY_DSN
           resources:
             requests:
-              cpu: 125m
-              memory: 128Mi
+              cpu: 50m
+              memory: 96Mi
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: 500m
+              memory: 256Mi
           livenessProbe:
             httpGet:
               path: /health

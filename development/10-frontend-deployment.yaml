@@ -140,11 +140,11 @@ spec:
                   key: R2_BASE_URL
           resources:
             requests:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 50m
+              memory: 32Mi
             limits:
-              cpu: "2"
-              memory: 2Gi
+              cpu: 500m
+              memory: 128Mi
           livenessProbe:
             httpGet:
               path: /

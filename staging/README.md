@@ -2,7 +2,7 @@
 
 Deploys into namespace `astrolumina-staging`: blue + green variants at
 3 replicas each, Traefik `IngressRoute` on entryPoint `web` (plain HTTP),
-single host `staging.astrolumina.ro` with `/api/*` prefix routing (mirrors
+single host `staging.k8s.astrolumina.ro` with `/api/*` prefix routing (mirrors
 the Compose staging `routes.yml`). Blue is live by default.
 
 ## How this environment boots (read first)
@@ -252,20 +252,24 @@ Traefik gets a node IP from the bundled Klipper ServiceLB. Get one (on the CP):
 ssh "$K8S_CP_CONN" -- "kubectl get nodes -o wide"
 ```
 
-Add to `/etc/hosts` on your local machine (replace with the real node IP):
+Add to `/etc/hosts` on your local machine (use a Traefik worker IP,
+e.g. 192.168.122.11):
 
 ```text
-192.168.1.10 staging.astrolumina.ro
+192.168.122.11 staging.k8s.astrolumina.ro dashboard.k8s.astrolumina.ro
 ```
 
-Then open `http://staging.astrolumina.ro` in the browser, and check the API
+These `*.k8s.astrolumina.ro` names coexist with the Compose `127.0.0.1`
+entries — no context toggling needed for them.
+
+Then open `http://staging.k8s.astrolumina.ro` in the browser, and check the API
 routes directly (these `curl` runs stay on your LAPTOP — they test your
 host → node path):
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' http://staging.astrolumina.ro/api/astrology/<health-path>
-curl -s -o /dev/null -w '%{http_code}\n' http://staging.astrolumina.ro/api/booking/<health-path>
-curl -s -o /dev/null -w '%{http_code}\n' http://staging.astrolumina.ro/api/payment/<health-path>
+curl -s -o /dev/null -w '%{http_code}\n' http://staging.k8s.astrolumina.ro/api/astrology/<health-path>
+curl -s -o /dev/null -w '%{http_code}\n' http://staging.k8s.astrolumina.ro/api/booking/<health-path>
+curl -s -o /dev/null -w '%{http_code}\n' http://staging.k8s.astrolumina.ro/api/payment/<health-path>
 ```
 
 (Replace `<health-path>` with each API's real health endpoint.) The

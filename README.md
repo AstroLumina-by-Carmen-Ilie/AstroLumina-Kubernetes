@@ -30,10 +30,10 @@ and what to check when a step fails.
 |---|---|---|---|
 | Replicas | 1 | 3 | 3 |
 | Exposure | NodePort (30080, 30301/30302/30303), no ingress | Traefik IngressRoute, entryPoint `web` (HTTP) | Traefik IngressRoute, `web` redirect + `websecure` (TLS) |
-| Host | node IP | `staging.astrolumina.ro` | `astrolumina.ro` |
+| Host | node IP | `staging.k8s.astrolumina.ro` | `production.k8s.astrolumina.ro` |
 | API routing | direct NodePort per service | single host + `/api/*` path prefix, prefix stripped | same as staging |
 | TLS | none | none | Let's Encrypt via `letsencrypt` certResolver |
-| Dashboard | none | Traefik dashboard route, no auth | dashboard route + basicAuth (`dashboard.astrolumina.ro`) |
+| Dashboard | none | dashboard route on HTTP, no auth (`dashboard.k8s.astrolumina.ro`) | same host on HTTPS + basicAuth |
 | HPA | min 1 / max 3 | min 3 / max 6 | min 3 / max 9 |
 
 ## Docker Compose parity
@@ -117,11 +117,11 @@ dashboard copy-paste), e.g. for development:
 - RKE2 ships Traefik with the bundled Klipper ServiceLB, so Traefik's
   external IP is a node IP. Reach the cluster from your host via that IP.
 - `/etc/hosts` on your machine (example, replace with the real node IP):
-  `192.168.1.10 staging.astrolumina.ro astrolumina.ro dashboard.astrolumina.ro`
+  `192.168.122.11 staging.k8s.astrolumina.ro production.k8s.astrolumina.ro dashboard.k8s.astrolumina.ro` (these coexist with the Compose `127.0.0.1` entries — no toggling needed)
 - Development: `http://<node-ip>:30080` (frontend),
   `30301/30302/30303` for astrology / payment / booking.
-- Staging: `http://staging.astrolumina.ro` (port 80).
-- Production: `https://astrolumina.ro` (port 443, LE certificate).
+- Staging: `http://staging.k8s.astrolumina.ro` (port 80).
+- Production: `https://production.k8s.astrolumina.ro` (port 443; LE cert only with real public DNS).
 - Let's Encrypt prerequisite: RKE2 installs Traefik from a HelmChart, so the
   `letsencrypt` certResolver (email `admin@astrolumina.com`) must be added to
   the Traefik `HelmChartConfig` values before applying production, e.g.

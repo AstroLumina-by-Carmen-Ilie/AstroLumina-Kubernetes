@@ -3,8 +3,10 @@
 Deploys into namespace `astrolumina-prod`: blue + green variants at
 3 replicas each, Traefik `IngressRoute` on `web` (redirect to HTTPS) +
 `websecure` (TLS via the `letsencrypt` certResolver), single host
-`astrolumina.ro` with `/api/*` prefix routing, dashboard at
-`dashboard.astrolumina.ro` protected by basicAuth. Blue is live by default.
+`production.k8s.astrolumina.ro` with `/api/*` prefix routing, plus the
+Traefik dashboard at `dashboard.k8s.astrolumina.ro` on HTTPS with basicAuth
+(TLS via `letsencrypt`; entryPoint split with staging: plain HTTP serves
+the staging dashboard, HTTPS serves this one). Blue is live by default.
 
 Read this whole file once before running anything: steps 2 and 3 must happen
 BEFORE the first `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"`.
@@ -133,7 +135,7 @@ ssh "$K8S_CP_CONN" -- "kubectl -n kube-system logs deploy/rke2-traefik | grep -i
 
 IMPORTANT, read twice: Let's Encrypt `httpChallenge` requires the public
 internet to reach your domain on port 80. This works only if
-`astrolumina.ro` resolves publicly to your node IP. If you are testing
+`production.k8s.astrolumina.ro` resolves publicly to your node IP. If you are testing
 locally with a fake `/etc/hosts` entry (step 7), issuance WILL fail and
 Traefik will serve its default self-signed cert instead (browser warning,
 `curl -k` needed). That is fine for a connectivity test, but do NOT mistake
@@ -310,17 +312,17 @@ ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-prod"
 Get a node IP (`ssh "$K8S_CP_CONN" -- "kubectl get nodes -o wide"`) and add to `/etc/hosts` on your laptop:
 
 ```text
-192.168.1.10 astrolumina.ro dashboard.astrolumina.ro
+192.168.122.11 production.k8s.astrolumina.ro dashboard.k8s.astrolumina.ro
 ```
 
-- App: `https://astrolumina.ro`
-- Dashboard: `https://dashboard.astrolumina.ro` (admin + password from step 3)
+- App: `https://production.k8s.astrolumina.ro`
+- Dashboard: `https://dashboard.k8s.astrolumina.ro` (TLS + basicAuth, admin + password from step 3; plain `http://` serves the staging dashboard)
 - API spot checks (from your LAPTOP — they test your host → node path):
 
 ```bash
-curl -sk -o /dev/null -w '%{http_code}\n' https://astrolumina.ro/api/astrology/<health-path>
-curl -sk -o /dev/null -w '%{http_code}\n' https://astrolumina.ro/api/booking/<health-path>
-curl -sk -o /dev/null -w '%{http_code}\n' https://astrolumina.ro/api/payment/<health-path>
+curl -sk -o /dev/null -w '%{http_code}\n' https://production.k8s.astrolumina.ro/api/astrology/<health-path>
+curl -sk -o /dev/null -w '%{http_code}\n' https://production.k8s.astrolumina.ro/api/booking/<health-path>
+curl -sk -o /dev/null -w '%{http_code}\n' https://production.k8s.astrolumina.ro/api/payment/<health-path>
 ```
 
 (`-k` only while the certificate is not publicly trusted; drop it once LE
@@ -328,7 +330,7 @@ issued a real cert, otherwise you are not testing TLS.) With a real cert,
 confirm it explicitly:
 
 ```bash
-echo | openssl s_client -connect astrolumina.ro:443 -servername astrolumina.ro 2>/dev/null | grep -i "issuer\|verify return"
+echo | openssl s_client -connect production.k8s.astrolumina.ro:443 -servername production.k8s.astrolumina.ro 2>/dev/null | grep -i "issuer\|verify return"
 ```
 
 Expected issuer: Let's Encrypt.
