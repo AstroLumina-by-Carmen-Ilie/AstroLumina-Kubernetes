@@ -8,6 +8,13 @@ kind: IngressRoute
 metadata:
   name: astrolumina
   namespace: astrolumina-staging
+  # RKE2 Traefik only processes IngressRoutes carrying this class
+  # (--providers.kubernetescrd.ingressClass=traefik); without it the route
+  # is silently ignored and every request 404s. NOTE: the installed CRD
+  # schema has no spec.ingressClassName field, so the (deprecated but still
+  # honored) annotation is used instead.
+  annotations:
+    kubernetes.io/ingress.class: traefik
   labels:
     app.kubernetes.io/part-of: astrolumina
     environment: staging
@@ -58,6 +65,9 @@ kind: IngressRoute
 metadata:
   name: traefik-dashboard
   namespace: astrolumina-staging
+  # Same ingressClass requirement as above (see NOTE on the main route).
+  annotations:
+    kubernetes.io/ingress.class: traefik
   labels:
     app.kubernetes.io/part-of: astrolumina
     environment: staging

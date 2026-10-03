@@ -280,7 +280,7 @@ Blue serves traffic now. To switch to green:
 your laptop, so the `ssh` carries a `-L` tunnel and the remote
 `port-forward` binds to the CP's localhost:
 ```bash
-ssh -L 8080:localhost:8080 "$K8S_CP_CONN" -- kubectl port-forward -n astrolumina-staging svc/frontend-green 8080:80
+ssh -L 8080:localhost:8080 "$K8S_CP_CONN" -- kubectl port-forward -n astrolumina-staging deploy/frontend-green 8080:80
 ```
 then open `http://localhost:8080` on your laptop.
 3. Flip the 4 `selector: variant: blue` fields to `green` in
