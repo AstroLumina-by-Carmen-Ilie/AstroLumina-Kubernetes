@@ -13,7 +13,7 @@ spec:
     kind: Deployment
     name: frontend-blue
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
@@ -36,7 +36,7 @@ spec:
     kind: Deployment
     name: frontend-green
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
@@ -59,7 +59,7 @@ spec:
     kind: Deployment
     name: astrology-api-blue
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
@@ -82,7 +82,7 @@ spec:
     kind: Deployment
     name: astrology-api-green
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
@@ -105,7 +105,7 @@ spec:
     kind: Deployment
     name: booking-api-blue
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
@@ -128,7 +128,7 @@ spec:
     kind: Deployment
     name: booking-api-green
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
@@ -151,7 +151,7 @@ spec:
     kind: Deployment
     name: payment-api-blue
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
@@ -174,7 +174,7 @@ spec:
     kind: Deployment
     name: payment-api-green
   minReplicas: 3
-  maxReplicas: 9
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:

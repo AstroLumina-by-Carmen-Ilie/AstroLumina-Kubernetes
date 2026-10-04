@@ -14,7 +14,7 @@ metadata:
     variant: green
 spec:
   # 3 replicas to mirror the Compose staging green service.
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: astrology-api
@@ -36,6 +36,17 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-secret
+      # Blue runs on worker-01, green on worker-02 (see README): together
+      # with the CP taint this keeps app pods off the control plane.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - rke2-worker-daniel-pirvu-02
       containers:
         - name: astrology-api
           image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:latest

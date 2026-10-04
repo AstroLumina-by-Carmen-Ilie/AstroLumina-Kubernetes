@@ -126,8 +126,10 @@ dashboard copy-paste), e.g. for development:
   `letsencrypt` certResolver (email `admin@astrolumina.com`) must be added to
   the Traefik `HelmChartConfig` values before applying production, e.g.
   `/var/lib/rancher/rke2/server/manifests/traefik-config.yaml` with
-  `certResolvers.letsencrypt` (httpChallenge on `web`) and
-  `persistence` enabled for `/certs/acme.json` equivalent storage.
+  `certResolvers.letsencrypt` (httpChallenge on `web`). NOTE: leave
+  `persistence.enabled: false` in this lab — the chart's PVC has no
+  StorageClass to bind to (this cluster has none), so `true` wedges the
+  Traefik rollout at 1/3. Enable it only with real storage + public DNS.
 - HPA needs metrics-server (not bundled with RKE2 by default).
 
 ## Deploy
@@ -137,3 +139,8 @@ ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/development"   # dev
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/staging"       # staging (blue live by default)
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"    # production (blue live by default)
 ```
+
+## Further reading: Helm, Kustomize, monitoring → `EXTRA.md`
+
+Helm vs Kustomize (interview version), why `helm` is missing on the CP,
+cheat-sheets, and the Prometheus+Grafana install live in `EXTRA.md`.
