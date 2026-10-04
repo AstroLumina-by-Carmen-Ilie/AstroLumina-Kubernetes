@@ -1,7 +1,7 @@
 # Staging — step-by-step deploy guide
 
 Deploys into namespace `astrolumina-staging`: blue + green variants at
-3 replicas each, Traefik `IngressRoute` on entryPoint `web` (plain HTTP),
+1 replica each, Traefik `IngressRoute` on entryPoint `web` (plain HTTP),
 single host `staging.k8s.astrolumina.ro` with `/api/*` prefix routing (mirrors
 the Compose staging `routes.yml`). Blue is live by default.
 
@@ -91,6 +91,23 @@ ssh "$K8S_CP_CONN" -- "sudo ln -sf /var/lib/rancher/rke2/bin/kubectl /usr/local/
 ```
 
 Expected: 3 nodes, all `Ready`. If not, stop here and fix the VMs first.
+
+Then taint the control plane so app pods never schedule there (fresh RKE2
+leaves the CP untainted and schedulable). One command, idempotent, safe to
+re-run — system pods (CoreDNS, canal, Traefik) already tolerate this
+standard taint, app pods don't:
+
+```bash
+ssh "$K8S_CP_CONN" -- "kubectl taint nodes -l node-role.kubernetes.io/control-plane=true node-role.kubernetes.io/control-plane=:NoSchedule --overwrite"
+```
+
+Placement contract for this environment: blue Deployments carry
+`nodeAffinity` pinning them to worker-01
+(`rke2-worker-daniel-pirvu-01`), green to worker-02
+(`rke2-worker-daniel-pirvu-02`) — each color lives on its own worker and
+nothing lands on the CP. Every Deployment runs a single replica and each
+HPA scales its app 1–3 — staging is sized for realism on lab hardware, not
+for load. Even at max burst both colors fit their workers comfortably.
 
 ## 2. Install the Doppler operator (once per cluster rebuild)
 

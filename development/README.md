@@ -91,6 +91,19 @@ ssh "$K8S_CP_CONN" -- "sudo ln -sf /var/lib/rancher/rke2/bin/kubectl /usr/local/
 
 Expected: 3 nodes, all `Ready`. If not, stop here and fix the VMs first.
 
+Then taint the control plane so app pods never schedule there (fresh RKE2
+leaves the CP untainted and schedulable). One command, idempotent, safe to
+re-run — system pods (CoreDNS, canal, Traefik) already tolerate this
+standard taint, app pods don't:
+
+```bash
+ssh "$K8S_CP_CONN" -- "kubectl taint nodes -l node-role.kubernetes.io/control-plane=true node-role.kubernetes.io/control-plane=:NoSchedule --overwrite"
+```
+
+Placement contract for this environment: dev pods carry no node affinity —
+the taint alone keeps them on the two workers, wherever the scheduler fits
+them.
+
 ## 2. Install the Doppler operator (once per cluster rebuild)
 
 ```bash
