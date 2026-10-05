@@ -2,8 +2,8 @@
 # Single-host routing for production, mirroring the Compose routers: one host
 # (production.k8s.astrolumina.ro), /api/* prefixes stripped before the apps, HTTPS on
 # entryPoint websecure with the letsencrypt certResolver (same email, same
-# httpChallenge as the Compose production Traefik static config). Port 80 only
-# redirects to HTTPS. Traffic goes to the *-live Services; the blue-green
+# httpChallenge as the Compose production Traefik static config). HTTP is NOT
+# served at all. Traffic goes to the *-live Services; the blue-green
 # switch flips the 4 selectors in 53-live-services.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -22,16 +22,8 @@ metadata:
     environment: production
 spec:
   entryPoints:
-    - web
     - websecure
   routes:
-    - match: Host(`production.k8s.astrolumina.ro`)
-      kind: Rule
-      middlewares:
-        - name: to-https
-      services:
-        - name: noop@internal
-          kind: TraefikService
     - match: Host(`production.k8s.astrolumina.ro`) && PathPrefix(`/api/astrology`)
       kind: Rule
       middlewares:

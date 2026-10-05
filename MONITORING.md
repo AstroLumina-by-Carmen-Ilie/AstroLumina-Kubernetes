@@ -77,7 +77,7 @@ ssh "$K8S_CP_CONN" -- "helm version >/dev/null 2>&1 || curl -fsSL https://raw.gi
 # Traefik basicAuth (dashboard, Prometheus below) takes the full htpasswd line.
 export GRAFANA_ADMIN=$(doppler secrets get GRAFANA_ADMIN_PASSWORD --plain --project astrolumina --config prd)
 ssh "$K8S_CP_CONN" -- "helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm repo update"
-ssh "$K8S_CP_CONN" -- 'helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring --create-namespace -f ~/monitoring-values.yaml --set grafana.adminPassword='"$GRAFANA_ADMIN"'"
+ssh "$K8S_CP_CONN" -- 'helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring --create-namespace -f ~/monitoring-values.yaml --set grafana.adminPassword='"$GRAFANA_ADMIN"
 unset GRAFANA_ADMIN
 ```
 
@@ -117,6 +117,9 @@ quotes, so nothing expands on either side):
 
 ```bash
 cat > /tmp/monitoring-routes.yaml <<'EOF'
+# Both routes are HTTPS-only on websecure. HTTP is deliberately NOT served.
+# `tls: {}` serves Traefik's default self-signed cert (lab has no public
+# DNS, so Let's Encrypt cannot issue) — expect a browser cert warning.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -125,7 +128,8 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: traefik
 spec:
-  entryPoints: [web]
+  entryPoints: [websecure]
+  tls: {}
   routes:
     - match: Host(`grafana.k8s.astrolumina.ro`)
       kind: Rule
@@ -141,14 +145,15 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: traefik
 spec:
-  entryPoints: [web]
+  entryPoints: [websecure]
+  tls: {}
   routes:
     - match: Host(`prometheus.k8s.astrolumina.ro`)
       kind: Rule
       middlewares:
         - name: prometheus-auth
       services:
-        - name: monitoring-kube-prometheus-stack-prometheus
+        - name: monitoring-kube-prometheus-prometheus
           port: 9090
 ---
 # BasicAuth for Prometheus (same password as Grafana). The `secret` value is
@@ -195,6 +200,15 @@ workloads but NOT the PVCs — Prometheus/Grafana data stays on the node disks
 until you delete the PVCs explicitly. That is a feature here (survives
 accidental uninstalls and all VM reboots), just remember it when you actually
 want a clean slate: `kubectl delete pvc --all -n monitoring`.
+
+NOTE (changing the Grafana admin password later): the password from
+`GRAFANA_ADMIN_PASSWORD` is only consumed on a FRESH database — Grafana
+keeps the old hash in its sqlite DB on the `monitoring-grafana` PVC, so
+patching the secret alone changes nothing at login. Full reset: patch the
+secret, scale the deploy to 0, delete the PVC, re-create it manually (Helm
+chart PVCs do NOT auto-recreate — same 5Gi `local-path` RWO claim),
+scale back to 1. If the old pod hangs in `Terminating`, force-delete it
+(`kubectl delete pod <name> -n monitoring --force --grace-period=0`).
 
 NOTE (repo strategy): this repo stays Kustomize forever. Real Helm charts for
 our apps will live in the separate AstroLumina-Helm repo and get consumed
