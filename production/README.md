@@ -1,12 +1,11 @@
 # Production — step-by-step deploy guide
 
 Deploys into namespace `astrolumina-prod`: blue + green variants at
-3 replicas each, Traefik `IngressRoute` on `web` (redirect to HTTPS) +
-`websecure` (TLS via the `letsencrypt` certResolver), single host
+3 replicas each, Traefik `IngressRoute` HTTPS-only on `websecure`
+(TLS via the `letsencrypt` certResolver), single host
 `production.k8s.astrolumina.ro` with `/api/*` prefix routing, plus the
-Traefik dashboard at `dashboard.k8s.astrolumina.ro` on HTTPS with basicAuth
-(TLS via `letsencrypt`; entryPoint split with staging: plain HTTP serves
-the staging dashboard, HTTPS serves this one). Blue is live by default.
+Traefik dashboard at `dashboard.k8s.astrolumina.ro` on HTTPS with basicAuth.
+HTTP is not served. Blue is live by default.
 
 Read this whole file once before running anything: steps 2 and 3 must happen
 BEFORE the first `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"`.
