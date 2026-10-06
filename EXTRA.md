@@ -241,9 +241,3 @@ kubectl kustomize /mnt/k8s/development      # render, do not apply (check)
 kubectl apply -k /mnt/k8s/development       # render + apply
 kubectl diff -k /mnt/k8s/staging            # what would change, without applying
 ```
-
-## 4. Monitoring: Prometheus + Grafana via Helm
-
-Moved to [MONITORING.md](./MONITORING.md) — install steps, storage backend,
-Traefik routes (`prometheus.k8s.astrolumina.ro`, `grafana.k8s.astrolumina.ro`),
-verify, and day-2 operations.

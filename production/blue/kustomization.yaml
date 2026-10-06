@@ -1,14 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# NOTE: intentionally no top-level "namespace:" here. Every resource file
-# carries its own explicit namespace (the kustomize namespace transformer
-# would override file-level namespaces).
-
 resources:
   - 10-frontend-deployment.yaml
   - 20-astrology-api-deployment.yaml
   - 30-booking-api-deployment.yaml
   - 40-payment-api-deployment.yaml
-
-# NOTE: intentionally no commonLabels here (see root kustomization).
