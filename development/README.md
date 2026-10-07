@@ -50,14 +50,11 @@ There is NO third phase anymore: no placeholder files are listed in
 - In Doppler: project `astrolumina`, config `dev`, holding the complete
   runtime set for the stack (every key the Deployments reference — the
   manifests plus the `01-doppler-secrets.yaml` sync lists are the exact
-  schema, so no separate list is needed here). Three groups of keys take part in the setup
+  schema, so no separate list is needed here). Two groups of keys take part in the setup
   itself, and you will export each of them below:
   - `GITHUB_USER`, `GITHUB_TOKEN` (PAT with `read:packages`) and
     `GITHUB_EMAIL` — the GHCR pull credentials used in step 3b
     (`dockerconfigjson` needs all three: username, password, email).
-  - `FRONTEND_DOCKER_IMAGE_TAG`, `ASTROLOGY_API_DOCKER_IMAGE_TAG`,
-    `BOOKING_API_DOCKER_IMAGE_TAG`, `PAYMENT_API_DOCKER_IMAGE_TAG`
-    (all `latest` for dev) — the exact tags pinned in step 3c.
   - `DOPPLER_SERVICE_TOKEN` — the service token of the `dev` config,
     consumed in step 4. No dashboard copy-paste anywhere: every value
     below comes from `doppler secrets get`.
@@ -172,39 +169,26 @@ in step 3 applies).
 Do NOT commit the real credentials — create them only with the command
 above, never in a file.
 
-## 3c. Pin the images to the Doppler tags
+## 3c. Image tags are pinned in git
 
-The manifests ship every image as `:latest`. The real tag per service lives
-in Doppler (config `dev`): `FRONTEND_DOCKER_IMAGE_TAG`,
-`ASTROLOGY_API_DOCKER_IMAGE_TAG`, `BOOKING_API_DOCKER_IMAGE_TAG`,
-`PAYMENT_API_DOCKER_IMAGE_TAG`. (A Deployment's `image:` field is static —
-Kubernetes cannot read it from a Secret — so the tags are applied
-imperatively here, same pattern as steps 3b and 4. `imagePullPolicy` stays
-`Always`, so `:latest` still resolves fresh even before this step runs.)
-`export` lines on the laptop, `set image` on the CP (tags are plain
-version strings, double quotes are safe):
+Image tags are the source of truth in git — the same model as the Compose
+`versions.env` files (the development `versions.env` holds the same values,
+currently `latest` everywhere). Doppler no longer carries any
+`*_DOCKER_IMAGE_TAG` keys. Each Deployment's `image:` field already
+references its tag, so applying the manifests is all it takes
+(`imagePullPolicy` stays `Always`, so `:latest` still resolves fresh on
+every pull).
+
+To try a pinned build, bump the tag in the 4 Deployment files, commit, and
+re-apply:
 
 ```bash
-export FRONTEND_TAG=$(doppler secrets get FRONTEND_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
-export ASTROLOGY_TAG=$(doppler secrets get ASTROLOGY_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
-export BOOKING_TAG=$(doppler secrets get BOOKING_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
-export PAYMENT_TAG=$(doppler secrets get PAYMENT_API_DOCKER_IMAGE_TAG --plain --project astrolumina --config dev)
-ssh "$K8S_CP_CONN" -- "kubectl set image deploy/frontend frontend=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-frontend:$FRONTEND_TAG -n astrolumina-dev"
-ssh "$K8S_CP_CONN" -- "kubectl set image deploy/astrology-api astrology-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:$ASTROLOGY_TAG -n astrolumina-dev"
-ssh "$K8S_CP_CONN" -- "kubectl set image deploy/booking-api booking-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:$BOOKING_TAG -n astrolumina-dev"
-ssh "$K8S_CP_CONN" -- "kubectl set image deploy/payment-api payment-api=ghcr.io/astrolumina-by-carmen-ilie/astrolumina-paymentapi:$PAYMENT_TAG -n astrolumina-dev"
-unset FRONTEND_TAG ASTROLOGY_TAG BOOKING_TAG PAYMENT_TAG
-ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/frontend -n astrolumina-dev"
-ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/astrology-api -n astrolumina-dev"
-ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/booking-api -n astrolumina-dev"
-ssh "$K8S_CP_CONN" -- "kubectl rollout status deploy/payment-api -n astrolumina-dev"
-ssh "$K8S_CP_CONN" -- "kubectl get pods -n astrolumina-dev"
+ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/development && kubectl get pods -n astrolumina-dev"
 ```
 
-Expected: the Deployments restart on the exact tags from Doppler
-(`ssh "$K8S_CP_CONN" -- "kubectl describe deploy/frontend -n astrolumina-dev | grep Image:"`
-shows the tag). If a pod reports `ErrImagePull` with `manifest unknown`, the tag
-in Doppler does not exist on GHCR — fix the value in Doppler and re-run.
+Expected: the Deployments run the tags from git. If a pod reports
+`ErrImagePull` with `manifest unknown`, the tag does not exist on GHCR —
+fix the value in the manifests and re-apply.
 
 ## 4. Create the token Secret and let the operator sync
 
