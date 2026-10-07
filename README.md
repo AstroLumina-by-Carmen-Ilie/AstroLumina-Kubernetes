@@ -49,7 +49,7 @@ and what to check when a step fails.
 - **The 4-line switch**: live traffic is the 4 `selector: variant:` fields in
   `53-live-services.yaml`. Flip `blue` to `green` and re-apply to cut over.
 - **Frontend env injection**: the frontend image reads `public/env.js`
-  placeholders filled by runtime variables (e.g. `ASTROLOGICAL_API_URL`,
+  placeholders filled by runtime variables (e.g. `ASTROLOGY_API_URL`,
   `STRIPE_PK`), not `VITE_*`. Those variables live in Doppler and are
   synced into the `env-frontend-secrets` Secret, exactly like every other
   variable.
@@ -86,10 +86,10 @@ ssh "$K8S_CP_CONN" -- "kubectl apply -f https://github.com/DopplerHQ/kubernetes-
   resources (one per managed Secret, key subsets included), so
   `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/<env>"` brings up
 everything at once. Create the token after each rebuild from the
-`K8S_SERVICE_TOKEN` Doppler secret (fetch it like any other key, no
+`DOPPLER_SERVICE_TOKEN` Doppler secret (fetch it like any other key, no
 dashboard copy-paste), e.g. for development:
-`export K8S_SERVICE_TOKEN=$(doppler secrets get K8S_SERVICE_TOKEN --plain --project astrolumina --config dev)` then
-`ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'`.
+`export DOPPLER_SERVICE_TOKEN=$(doppler secrets get DOPPLER_SERVICE_TOKEN --plain --project astrolumina --config dev)` then
+`ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$DOPPLER_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'`.
 - Boot order per environment: apply kustomize (no secrets in git) -> create
   pull secret + token imperatively (REQUIRED manual steps) -> verify sync.
   Re-applying is a no-op on secrets, so ArgoCD can sync freely. Full command

@@ -62,7 +62,7 @@ There is NO third phase anymore: no placeholder files are listed in
     `BOOKING_API_DOCKER_IMAGE_TAG` (2.0.5),
     `PAYMENT_API_DOCKER_IMAGE_TAG` (2.0.6) — the exact tags pinned in
     step 5c.
-  - `K8S_SERVICE_TOKEN` — the service token of the `prd` config,
+  - `DOPPLER_SERVICE_TOKEN` — the service token of the `prd` config,
     consumed in step 6. No dashboard copy-paste anywhere: every value
     below comes from `doppler secrets get`.
 - The images referenced by the Deployments are private on GHCR. Every
@@ -277,21 +277,21 @@ on BOTH colors every time you promote a new build.
 ## 6. Create the token Secret and let the operator sync
 
 The token is deliberately NOT in git. It already lives in Doppler as
-`K8S_SERVICE_TOKEN` (per-environment value, `prd` config) — pull it into
+`DOPPLER_SERVICE_TOKEN` (per-environment value, `prd` config) — pull it into
 your shell, then consume it (idempotent, safe to re-run):
 
 ```bash
-export K8S_SERVICE_TOKEN=$(doppler secrets get K8S_SERVICE_TOKEN --plain --project astrolumina --config prd)
-ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-prd -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'
+export DOPPLER_SERVICE_TOKEN=$(doppler secrets get DOPPLER_SERVICE_TOKEN --plain --project astrolumina --config prd)
+ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-prd -n doppler-operator-system --from-literal=serviceToken='"$DOPPLER_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'
 ```
 
-If `doppler secrets get K8S_SERVICE_TOKEN` ever reports the key missing
+If `doppler secrets get DOPPLER_SERVICE_TOKEN` ever reports the key missing
 (e.g. revoked upstream and never re-saved), mint a fresh one without
 touching the dashboard (uses your existing Doppler CLI login) and store it
 back in Doppler under the same name, so this step stays zero-paste:
 
 ```bash
-export K8S_SERVICE_TOKEN=$(doppler configs tokens create k8s-prd --project astrolumina --config prd --plain)
+export DOPPLER_SERVICE_TOKEN=$(doppler configs tokens create k8s-prd --project astrolumina --config prd --plain)
 ```
 
 then re-run the `kubectl create secret` above. (Generated tokens pile up in

@@ -58,7 +58,7 @@ There is NO third phase anymore: no placeholder files are listed in
   - `FRONTEND_DOCKER_IMAGE_TAG`, `ASTROLOGY_API_DOCKER_IMAGE_TAG`,
     `BOOKING_API_DOCKER_IMAGE_TAG`, `PAYMENT_API_DOCKER_IMAGE_TAG`
     (all `latest` for dev) — the exact tags pinned in step 3c.
-  - `K8S_SERVICE_TOKEN` — the service token of the `dev` config,
+  - `DOPPLER_SERVICE_TOKEN` — the service token of the `dev` config,
     consumed in step 4. No dashboard copy-paste anywhere: every value
     below comes from `doppler secrets get`.
 - The images referenced by the Deployments are private on GHCR. Every
@@ -209,21 +209,21 @@ in Doppler does not exist on GHCR — fix the value in Doppler and re-run.
 ## 4. Create the token Secret and let the operator sync
 
 The token is deliberately NOT in git. It already lives in Doppler as
-`K8S_SERVICE_TOKEN` (per-environment value, `dev` config) — pull it into
+`DOPPLER_SERVICE_TOKEN` (per-environment value, `dev` config) — pull it into
 your shell, then consume it (idempotent, safe to re-run):
 
 ```bash
-export K8S_SERVICE_TOKEN=$(doppler secrets get K8S_SERVICE_TOKEN --plain --project astrolumina --config dev)
-ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'
+export DOPPLER_SERVICE_TOKEN=$(doppler secrets get DOPPLER_SERVICE_TOKEN --plain --project astrolumina --config dev)
+ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$DOPPLER_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'
 ```
 
-If `doppler secrets get K8S_SERVICE_TOKEN` ever reports the key missing
+If `doppler secrets get DOPPLER_SERVICE_TOKEN` ever reports the key missing
 (e.g. revoked upstream and never re-saved), mint a fresh one without
 touching the dashboard (uses your existing Doppler CLI login) and store it
 back in Doppler under the same name, so this step stays zero-paste:
 
 ```bash
-export K8S_SERVICE_TOKEN=$(doppler configs tokens create k8s-dev --project astrolumina --config dev --plain)
+export DOPPLER_SERVICE_TOKEN=$(doppler configs tokens create k8s-dev --project astrolumina --config dev --plain)
 ```
 
 then re-run the `kubectl create secret` above. (Generated tokens pile up in
@@ -278,9 +278,9 @@ The frontend will load, but its API calls will fail out of the box:
 `env.js` carries `http://astrology-api:3031`-style URLs — cluster-internal
 DNS names your laptop browser cannot resolve. They are fixed in Doppler.
 The contract is: the manifest reads the app-facing names
-(`ASTROLOGICAL_API_URL` / `PAYMENT_API_URL` / `BOOKING_API_URL`) from the
+(`ASTROLOGY_API_URL` / `PAYMENT_API_URL` / `BOOKING_API_URL`) from the
 `*_K8S_URL` secret keys (`development/10-frontend-deployment.yaml`), so the
-`dev` config must hold `ASTROLOGICAL_API_K8S_URL`, `PAYMENT_API_K8S_URL`,
+`dev` config must hold `ASTROLOGY_API_K8S_URL`, `PAYMENT_API_K8S_URL`,
 `BOOKING_API_K8S_URL` with the K8s-reachable endpoints
 (`http://<node-ip>:30301/30302/30303` — any node IP works, NodePort
 listens on all nodes).

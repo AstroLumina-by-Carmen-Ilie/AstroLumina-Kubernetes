@@ -1,0 +1,21 @@
+# KubeLinter configuration for the AstroLumina Kubernetes manifests.
+# Runs the default check set MINUS the four exclusions below.
+# (Deliberately NOT addAllBuiltIn: the full set includes opinionated checks
+# such as required-label-owner and hpa-minimum-three-replicas that do not
+# fit this project. Each exclusion below is a documented trade-off.)
+checks:
+  exclude:
+    # Images are tagged :latest in git by design. The real tag is pinned
+    # imperatively at deploy time (kubectl set image, value from Doppler),
+    # so the manifests can never carry a fixed tag.
+    - latest-tag
+    # Blue-green placement is enforced with nodeAffinity (blue -> worker-01,
+    # green -> worker-02). Pod anti-affinity would fight that design.
+    - no-anti-affinity
+    # Hardening follow-up (also flagged by Trivy as KSV-0014): containers do
+    # not set readOnlyRootFilesystem yet. Enabling it needs runtime testing
+    # (nginx/node may write to disk), so it stays a tracked task, not a CI gate.
+    - no-read-only-root-fs
+    # Hardening follow-up (also flagged by Trivy as KSV-0118): containers do
+    # not set runAsNonRoot yet. Same as above - tracked task, not a CI gate.
+    - run-as-non-root
