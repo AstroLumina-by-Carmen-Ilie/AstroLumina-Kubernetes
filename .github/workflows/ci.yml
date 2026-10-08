@@ -1,0 +1,127 @@
+# CI for the raw Kubernetes manifests: lint, build, schema-check, scan.
+# Runs on every push and pull request.
+---
+name: Kubernetes CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  KUSTOMIZE_VERSION: v5.8.2
+  KUBECONFORM_VERSION: v0.8.0
+  KUBELINTER_VERSION: v0.8.3
+
+jobs:
+  # YAML style consistency across all manifests.
+  yaml-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: pip install yamllint==1.38.0
+      - run: yamllint development staging production
+
+  # Every kustomization (per color and per env root) must build.
+  # Built output is kept for the schema and policy jobs below.
+  kustomize-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install kustomize
+        run: >
+          curl -sL -o kustomize.tar.gz
+          "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          && tar xzf kustomize.tar.gz kustomize && sudo install kustomize /usr/local/bin/kustomize
+      - name: Build all kustomizations
+        run: |
+          mkdir -p /tmp/k8sbuild
+          for dir in development staging/blue staging/green staging production/blue production/green production; do
+            kustomize build "$dir" -o "/tmp/k8sbuild/$(echo "$dir" | tr / -).yaml"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kustomize-build
+          path: /tmp/k8sbuild/
+
+  # Strict schema validation of the built manifests against the Kubernetes
+  # JSON schemas. CRDs served by in-cluster operators (Doppler, Traefik)
+  # are skipped - no public schema exists for them.
+  kubeconform:
+    runs-on: ubuntu-latest
+    needs: kustomize-build
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: kustomize-build
+          path: /tmp/k8sbuild
+      - name: Install kubeconform
+        run: >
+          curl -sL -o kubeconform.tar.gz
+          "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          && tar xzf kubeconform.tar.gz kubeconform && sudo install kubeconform /usr/local/bin/kubeconform
+      - run: kubeconform -summary -skip DopplerSecret,IngressRoute,Middleware /tmp/k8sbuild/development.yaml
+      - run: kubeconform -summary -skip DopplerSecret,IngressRoute,Middleware /tmp/k8sbuild/staging.yaml
+      - run: kubeconform -summary -skip DopplerSecret,IngressRoute,Middleware /tmp/k8sbuild/production.yaml
+
+  # Best-practice policy check on the built manifests. Four checks are
+  # excluded with justification in .kube-linter.yaml.
+  kube-linter:
+    runs-on: ubuntu-latest
+    needs: kustomize-build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: kustomize-build
+          path: /tmp/k8sbuild
+      - name: Install kube-linter
+        run: >
+          curl -sL -o kube-linter.tar.gz
+          "https://github.com/stackrox/kube-linter/releases/download/${KUBELINTER_VERSION}/kube-linter-linux.tar.gz"
+          && tar xzf kube-linter.tar.gz kube-linter && sudo install kube-linter /usr/local/bin/kube-linter
+      - run: kube-linter lint --config .kube-linter.yaml --format plain /tmp/k8sbuild/development.yaml
+      - run: kube-linter lint --config .kube-linter.yaml --format plain /tmp/k8sbuild/staging.yaml
+      - run: kube-linter lint --config .kube-linter.yaml --format plain /tmp/k8sbuild/production.yaml
+
+  # Misconfiguration scan. Advisory only (exit-code 0): the manifests have
+  # known hardening gaps (read-only root fs, default securityContext - see
+  # .kube-linter.yaml) that need runtime testing first. Findings still land
+  # in the Security tab via SARIF.
+  trivy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+      - uses: github/codeql-action/upload-sarif@87ef0dc97def48aa960fbf026a2563ee9dbdb470 # v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  # Secret scan with the pinned OSS binary (the official action needs a paid
+  # license on org repos). Full-history scan; placeholders and burned historic
+  # secrets are allowlisted in .gitleaks.toml.
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - run: >
+          curl -sL -o gitleaks.tar.gz
+          https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          && tar xzf gitleaks.tar.gz gitleaks && sudo install gitleaks /usr/local/bin/gitleaks
+      - run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1

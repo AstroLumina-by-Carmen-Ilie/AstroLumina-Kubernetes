@@ -1,0 +1,23 @@
+# Gitleaks configuration for AstroLumina-Kubernetes.
+# The base rule set still applies; the global allowlist below covers only
+# proven false positives and historic secrets that are already burned.
+# If you reuse any value marked HISTORIC, rotate it immediately.
+[allowlist]
+description = "Placeholders, key-name false positives and burned historic secrets (see comments)"
+regexTarget = "line"
+regexes = [
+  # Placeholder dockerconfigjson (base64 of "REPLACE_WITH_GITHUB_USER:REPLACE_WITH_GITHUB_TOKEN").
+  # The real ghcr-secret is created imperatively and never committed.
+  '''UkVQTEFDRV9XSVRIX0dJVEhVQl9VU0VSOlJFUExBQ0VfV0lUSF9HSVRIVUJfVE9LRU4=''',
+  # secretKeyRef key names are bare uppercase identifiers, never secret values.
+  # Example: "key: ASTROLOGY_API_K8S_URL" only names the Secret entry to read.
+  '''key:\s+[A-Z][A-Z0-9_]+$''',
+  # HISTORIC secrets below were committed in development/02-secrets.yaml before
+  # the placeholder refactor and the file was later deleted. They must be treated
+  # as compromised: rotate each of them (RapidAPI, Cal.com, Resend, Sentry, Stripe).
+  '''6f3a5e9544mshd7e0a65190501c3p17f451jsn323abc5466e5''',
+  '''cal_live_a0220066e8130b3dcb1da48c039d589f''',
+  '''re_Yo6EjLos_LP4jZ69mkqauiknMbQxpi3M5''',
+  '''cfut_qn3iNqpYYxSnQoJj4W5mA5TVFKFr0FcxNRWEhLIK6e3991f7''',
+  '''sk_test_51QsKuwI8IlTXEO0J7GYkGORq736TunFslDCkAb6tceDDStwU7Nq6UOHx9CnbkmTJWA2WEERjA2JtRcLTyWfeXzzY00yursmiJq''',
+]

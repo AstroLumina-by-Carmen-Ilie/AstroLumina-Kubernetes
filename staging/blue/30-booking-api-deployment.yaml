@@ -49,7 +49,7 @@ spec:
                       - rke2-worker-daniel-pirvu-01
       containers:
         - name: booking-api
-          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:latest
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-bookingapi:2.0.7
           imagePullPolicy: Always
           ports:
             - name: http
@@ -63,72 +63,32 @@ spec:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: NODE_ENV
-            - name: FRONTEND_SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: FRONTEND_SERVER_PORT
-            - name: FRONTEND_SERVER_DNS
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: FRONTEND_SERVER_DNS
-            - name: ASTROLOGY_API_SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: ASTROLOGY_API_SERVER_PORT
-            - name: ASTROLOGY_API_SERVER_DNS
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: ASTROLOGY_API_SERVER_DNS
             - name: BOOKING_API_SERVER_PORT
               valueFrom:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: BOOKING_API_SERVER_PORT
-            - name: BOOKING_API_SERVER_DNS
+            - name: BOOKING_API_SENTRY_DSN
               valueFrom:
                 secretKeyRef:
                   name: env-booking-api-secrets
-                  key: BOOKING_API_SERVER_DNS
-            - name: PAYMENT_API_SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: PAYMENT_API_SERVER_PORT
-            - name: PAYMENT_API_SERVER_DNS
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: PAYMENT_API_SERVER_DNS
-            - name: FRONTEND_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: FRONTEND_SERVER_K8S_PORT
-            - name: ASTROLOGY_API_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: ASTROLOGY_API_SERVER_K8S_PORT
-            - name: BOOKING_API_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: BOOKING_API_SERVER_K8S_PORT
-            - name: PAYMENT_API_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: PAYMENT_API_SERVER_K8S_PORT
+                  key: BOOKING_API_SENTRY_DSN
             - name: CORS_ORIGINS
               valueFrom:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: CORS_ORIGINS
                   optional: true
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: RESEND_API_KEY
+            - name: CALCOM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: CALCOM_API_KEY
             - name: CALCOM_BASE_URL
               valueFrom:
                 secretKeyRef:
@@ -139,36 +99,101 @@ spec:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: R2_BASE_URL
-            - name: CALCOM_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: CALCOM_API_KEY
-            - name: RESEND_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: RESEND_API_KEY
             - name: D1_ACCOUNT_ID
               valueFrom:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: D1_ACCOUNT_ID
-            - name: D1_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: env-booking-api-secrets
-                  key: D1_API_TOKEN
             - name: D1_DATABASE_ID
               valueFrom:
                 secretKeyRef:
                   name: env-booking-api-secrets
                   key: D1_DATABASE_ID
-            - name: BOOKING_API_SENTRY_DSN
+            - name: D1_API_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: env-booking-api-secrets
-                  key: BOOKING_API_SENTRY_DSN
+                  key: D1_API_TOKEN
+            - name: ASTROLOGY_API_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: ASTROLOGY_API_SERVER_DC_PORT
+            - name: ASTROLOGY_API_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: ASTROLOGY_API_SERVER_DC_DNS
+            - name: ASTROLOGY_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: ASTROLOGY_API_SERVER_K8S_PORT
+            - name: ASTROLOGY_API_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: ASTROLOGY_API_SERVER_K8S_DNS
+            - name: BOOKING_API_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: BOOKING_API_SERVER_DC_PORT
+            - name: BOOKING_API_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: BOOKING_API_SERVER_DC_DNS
+            - name: BOOKING_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: BOOKING_API_SERVER_K8S_PORT
+            - name: BOOKING_API_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: BOOKING_API_SERVER_K8S_DNS
+            - name: PAYMENT_API_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: PAYMENT_API_SERVER_DC_PORT
+            - name: PAYMENT_API_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: PAYMENT_API_SERVER_DC_DNS
+            - name: PAYMENT_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: PAYMENT_API_SERVER_K8S_PORT
+            - name: PAYMENT_API_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: PAYMENT_API_SERVER_K8S_DNS
+            - name: FRONTEND_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: FRONTEND_SERVER_DC_PORT
+            - name: FRONTEND_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: FRONTEND_SERVER_DC_DNS
+            - name: FRONTEND_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: FRONTEND_SERVER_K8S_PORT
+            - name: FRONTEND_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-booking-api-secrets
+                  key: FRONTEND_SERVER_K8S_DNS
           resources:
             requests:
               cpu: 50m

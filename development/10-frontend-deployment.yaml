@@ -53,81 +53,11 @@ spec:
                 secretKeyRef:
                   name: env-frontend-secrets
                   key: FRONTEND_SERVER_PORT
-            - name: FRONTEND_SERVER_DNS
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: FRONTEND_SERVER_DNS
-            - name: ASTROLOGY_API_SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: ASTROLOGY_API_SERVER_PORT
-            - name: ASTROLOGY_API_SERVER_DNS
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: ASTROLOGY_API_SERVER_DNS
-            - name: BOOKING_API_SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: BOOKING_API_SERVER_PORT
-            - name: BOOKING_API_SERVER_DNS
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: BOOKING_API_SERVER_DNS
-            - name: PAYMENT_API_SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: PAYMENT_API_SERVER_PORT
-            - name: PAYMENT_API_SERVER_DNS
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: PAYMENT_API_SERVER_DNS
-            - name: FRONTEND_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: FRONTEND_SERVER_K8S_PORT
-            - name: ASTROLOGY_API_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: ASTROLOGY_API_SERVER_K8S_PORT
-            - name: BOOKING_API_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: BOOKING_API_SERVER_K8S_PORT
-            - name: PAYMENT_API_SERVER_K8S_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: PAYMENT_API_SERVER_K8S_PORT
             - name: FRONTEND_SENTRY_DSN
               valueFrom:
                 secretKeyRef:
                   name: env-frontend-secrets
                   key: FRONTEND_SENTRY_DSN
-            - name: ASTROLOGICAL_API_URL
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: ASTROLOGICAL_API_K8S_URL
-            - name: PAYMENT_API_URL
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: PAYMENT_API_K8S_URL
-            - name: BOOKING_API_URL
-              valueFrom:
-                secretKeyRef:
-                  name: env-frontend-secrets
-                  key: BOOKING_API_K8S_URL
             - name: STRIPE_PK
               valueFrom:
                 secretKeyRef:
@@ -138,6 +68,101 @@ spec:
                 secretKeyRef:
                   name: env-frontend-secrets
                   key: R2_BASE_URL
+            - name: ASTROLOGY_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_K8S_URL
+            - name: PAYMENT_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_K8S_URL
+            - name: BOOKING_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_K8S_URL
+            - name: ASTROLOGY_API_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_SERVER_DC_PORT
+            - name: ASTROLOGY_API_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_SERVER_DC_DNS
+            - name: ASTROLOGY_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_SERVER_K8S_PORT
+            - name: ASTROLOGY_API_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: ASTROLOGY_API_SERVER_K8S_DNS
+            - name: BOOKING_API_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_SERVER_DC_PORT
+            - name: BOOKING_API_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_SERVER_DC_DNS
+            - name: BOOKING_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_SERVER_K8S_PORT
+            - name: BOOKING_API_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: BOOKING_API_SERVER_K8S_DNS
+            - name: PAYMENT_API_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_SERVER_DC_PORT
+            - name: PAYMENT_API_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_SERVER_DC_DNS
+            - name: PAYMENT_API_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_SERVER_K8S_PORT
+            - name: PAYMENT_API_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: PAYMENT_API_SERVER_K8S_DNS
+            - name: FRONTEND_SERVER_DC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SERVER_DC_PORT
+            - name: FRONTEND_SERVER_DC_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SERVER_DC_DNS
+            - name: FRONTEND_SERVER_K8S_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SERVER_K8S_PORT
+            - name: FRONTEND_SERVER_K8S_DNS
+              valueFrom:
+                secretKeyRef:
+                  name: env-frontend-secrets
+                  key: FRONTEND_SERVER_K8S_DNS
           resources:
             requests:
               cpu: 25m

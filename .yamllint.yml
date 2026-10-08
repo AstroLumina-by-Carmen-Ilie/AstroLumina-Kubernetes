@@ -1,0 +1,7 @@
+# Yamllint config: relaxed style with a wider line limit for long
+# DopplerSecret sync lists and comment lines.
+extends: relaxed
+
+rules:
+  line-length:
+    max: 220

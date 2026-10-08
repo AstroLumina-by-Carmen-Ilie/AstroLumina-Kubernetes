@@ -15,7 +15,7 @@ staging/
   52-ingressroute.yaml# single-host IngressRoute on entryPoint web (HTTP)
   53-live-services.yaml # 4 stable *-live services = the traffic switch
 production/           # same shape as staging + TLS + dashboard auth
-03-doppler-secrets.yaml in each env # 4 DopplerSecrets (token made imperatively)
+01-doppler-secrets.yaml in each env # 4 DopplerSecrets (token made imperatively)
 README.md in each env # copy-paste runbook: exact commands in order
 ```
 
@@ -49,7 +49,7 @@ and what to check when a step fails.
 - **The 4-line switch**: live traffic is the 4 `selector: variant:` fields in
   `53-live-services.yaml`. Flip `blue` to `green` and re-apply to cut over.
 - **Frontend env injection**: the frontend image reads `public/env.js`
-  placeholders filled by runtime variables (e.g. `ASTROLOGICAL_API_URL`,
+  placeholders filled by runtime variables (e.g. `ASTROLOGY_API_URL`,
   `STRIPE_PK`), not `VITE_*`. Those variables live in Doppler and are
   synced into the `env-frontend-secrets` Secret, exactly like every other
   variable.
@@ -60,8 +60,9 @@ and what to check when a step fails.
 
 ## Secrets and Doppler
 
-- `02-secrets.yaml` files contain **placeholders only** (schema-exact keys).
-  Real secrets are never committed.
+- Real secrets are never committed: the Doppler operator creates the `env-*`
+  Secrets itself, and the pull secret + token are created imperatively once
+  per rebuild.
 - The Doppler Kubernetes Operator (installed once per cluster rebuild) syncs
   one Doppler config into 4 Kubernetes Secrets per environment:
 
@@ -81,21 +82,21 @@ ssh "$K8S_CP_CONN" -- "kubectl apply -f https://github.com/DopplerHQ/kubernetes-
 | `stg` | `doppler-token-stg` | `astrolumina-staging` | same 4 names |
 | `prd` | `doppler-token-prd` | `astrolumina-prod` | same 4 names |
 
-- `03-doppler-secrets.yaml` in each environment holds the 4 `DopplerSecret`
+- `01-doppler-secrets.yaml` in each environment holds the 4 `DopplerSecret`
   resources (one per managed Secret, key subsets included), so
   `ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/<env>"` brings up
 everything at once. Create the token after each rebuild from the
-`K8S_SERVICE_TOKEN` Doppler secret (fetch it like any other key, no
+`DOPPLER_SERVICE_TOKEN` Doppler secret (fetch it like any other key, no
 dashboard copy-paste), e.g. for development:
-`export K8S_SERVICE_TOKEN=$(doppler secrets get K8S_SERVICE_TOKEN --plain --project astrolumina --config dev)` then
-`ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$K8S_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'`.
-- Boot order per environment: apply kustomize (placeholders) -> create token
-  -> verify sync -> delete the `- 01-ghcr-secret.yaml` and `- 02-secrets.yaml`
-  lines from that environment's `kustomization.yaml` -> re-apply. Full command
+`export DOPPLER_SERVICE_TOKEN=$(doppler secrets get DOPPLER_SERVICE_TOKEN --plain --project astrolumina --config dev)` then
+`ssh "$K8S_CP_CONN" -- 'kubectl create secret generic doppler-token-dev -n doppler-operator-system --from-literal=serviceToken='"$DOPPLER_SERVICE_TOKEN"' --dry-run=client -o yaml | kubectl apply -f -'`.
+- Boot order per environment: apply kustomize (no secrets in git) -> create
+  pull secret + token imperatively (REQUIRED manual steps) -> verify sync.
+  Re-applying is a no-op on secrets, so ArgoCD can sync freely. Full command
   sequences with expected outputs live in each environment's `README.md`.
 - Doppler must provide every variable the Deployments reference
-  via `secretKeyRef` — the manifests plus `02-secrets.yaml` define the exact
-  schema. If a single key is missing from the Doppler config, the pod fails
+  via `secretKeyRef` — the manifests plus the `01-doppler-secrets.yaml`
+  sync lists define the exact schema. If a single key is missing from the Doppler config, the pod fails
   at startup (zod validation, exit 1) and the fix is always "add the key
   in Doppler".
   Deployments carry the `secrets.doppler.com/reload` annotation, so pods
@@ -139,8 +140,3 @@ ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/development"   # dev
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/staging"       # staging (blue live by default)
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"    # production (blue live by default)
 ```
-
-## Further reading: Helm, Kustomize, monitoring → `EXTRA.md`
-
-Helm vs Kustomize (interview version), why `helm` is missing on the CP,
-cheat-sheets, and the Prometheus+Grafana install live in `EXTRA.md`.
