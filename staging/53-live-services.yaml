@@ -90,4 +90,4 @@ spec:
   selector:
     app.kubernetes.io/name: payment-api
     app.kubernetes.io/component: payment-api
-    variant: blue # LIVE: flip to green to switch traffic
+    variant: green # LIVE: flip to green to switch traffic
