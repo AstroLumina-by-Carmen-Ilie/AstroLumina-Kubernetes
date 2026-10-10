@@ -24,7 +24,7 @@ spec:
   selector:
     app.kubernetes.io/name: frontend
     app.kubernetes.io/component: frontend
-    variant: green # LIVE: flip to green to switch traffic
+    variant: blue # LIVE: flip to green to switch traffic
 ---
 apiVersion: v1
 kind: Service
