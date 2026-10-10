@@ -140,3 +140,8 @@ ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/development"   # dev
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/staging"       # staging (blue live by default)
 ssh "$K8S_CP_CONN" -- "kubectl apply -k /mnt/k8s/production"    # production (blue live by default)
 ```
+
+Image tags are bumped in git via the manual `.github/workflows/deploy.yml`
+(env choice + per-service versions, branch + PR): dev edits the Deployments
+directly, staging/production edit the idle color only (live read from
+`53-live-services.yaml`, never flipped by the workflow).
