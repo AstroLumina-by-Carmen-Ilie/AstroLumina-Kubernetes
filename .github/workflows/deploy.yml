@@ -215,6 +215,14 @@ jobs:
             else
               gh pr create --base main --head "$BRANCH" \
                 --title "deploy ${{ inputs.environment }}: bump image tags" \
-                --body "Deploy ${{ inputs.environment }} (run ${{ github.run_number }}). Merge, then SYNC the ArgoCD app; live already flipped."
+                --body "Manual deploy to ${{ inputs.environment }} (run ${{ github.run_number }}). Merge, then SYNC the ArgoCD app (or kubectl apply) and flip traffic when ready." || {
+                echo "HINT: if the error above says 'GitHub Actions is not permitted" >&2
+                echo "to create or approve pull requests', enable 'Allow GitHub Actions" >&2
+                echo "to create and approve pull requests' under Settings -> Actions ->" >&2
+                echo "General -> Workflow permissions (can be set once at org level)." >&2
+                echo "The branch $BRANCH is already pushed -- flip the setting," >&2
+                echo "then re-run this job." >&2
+                exit 1
+              }
             fi
           fi
