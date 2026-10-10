@@ -68,7 +68,7 @@ spec:
   selector:
     app.kubernetes.io/name: booking-api
     app.kubernetes.io/component: booking-api
-    variant: green # LIVE: flip to green to switch traffic
+    variant: blue # LIVE: flip to green to switch traffic
 ---
 apiVersion: v1
 kind: Service
