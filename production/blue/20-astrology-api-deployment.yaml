@@ -49,7 +49,7 @@ spec:
                       - rke2-worker-daniel-pirvu-01
       containers:
         - name: astrology-api
-          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:2.0.8
+          image: ghcr.io/astrolumina-by-carmen-ilie/astrolumina-astrologyapi:2.0.13
           imagePullPolicy: Always
           ports:
             - name: http
