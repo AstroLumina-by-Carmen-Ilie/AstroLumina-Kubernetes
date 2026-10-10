@@ -14,8 +14,9 @@
 #   specified image tags are replaced in place.
 # - staging/production: each service has blue + green Deployments. The live
 #   color is read from 53-live-services.yaml (the `<svc>-live` Service
-#   selectors) and only the IDLE Deployment image is bumped. Traffic is NOT
-#   flipped here -- flip the selectors afterwards, same as the promote flow.
+#   selectors), the IDLE Deployment image is bumped, and traffic is flipped
+#   to it in the same commit (selector rewritten, # LIVE comment preserved)
+#   -- full blue-green promotion, same as the promote flow.
 # =============================================================================
 
 name: Deploy
@@ -138,8 +139,10 @@ jobs:
                   set_image(path, image, ver)
                   print(f"{svc}: image set to {ver}")
           else:
-              with open(f"{env_dir}/53-live-services.yaml") as f:
-                  docs = [d for d in yaml.safe_load_all(f) if d]
+              live_path = f"{env_dir}/53-live-services.yaml"
+              with open(live_path) as f:
+                  lsrc = f.read()
+              docs = [d for d in yaml.safe_load_all(lsrc) if d]
               live_of = {}
               for doc in docs:
                   if doc.get("kind") != "Service":
@@ -162,7 +165,25 @@ jobs:
                       f"{path} carries variant {labels.get('variant')!r}, "
                       f"refusing to touch the live color")
                   set_image(path, image, ver)
-                  print(f"{svc}: live={live}, idle {idle} image set to {ver}")
+                  # Flip traffic to the freshly bumped idle color in the
+                  # same commit. The replace is scoped to the single
+                  # `<svc>-live` Service document so same-colored siblings
+                  # are untouched; the # LIVE comment survives.
+                  chunks = re.split(r"(?m)^(---.*)$", lsrc)
+                  idx = next(
+                      i for i, c in enumerate(chunks)
+                      if f"name: {svc}-live" in c and "kind: Service" in c)
+                  chunks[idx], n = re.subn(
+                      f"^(\\s*variant:\\s*){live}(\\s*(?:#.*)?)$",
+                      f"\\g<1>{idle}\\g<2>",
+                      chunks[idx], count=1, flags=re.M)
+                  assert n == 1, (
+                      f"live variant line for {svc} not found exactly once")
+                  lsrc = "".join(chunks)
+                  print(f"{svc}: live={live} -> idle {idle} image set to "
+                        f"{ver}, traffic flipped to {idle}")
+              with open(live_path, "w") as f:
+                  f.write(lsrc)
           PYEOF
 
       - name: Commit to branch and open deploy PR
