@@ -1,0 +1,199 @@
+# =============================================================================
+# AstroLumina Kubernetes -- Deploy
+#
+# Single manual deploy workflow. Bumps container image tags IN GIT on a
+# branch and opens a PR to main -- a human merges, then ArgoCD (manual SYNC)
+# or kubectl applies the change.
+#
+# Inputs: required environment choice (development/staging/production) plus four
+# optional version texts. At least one version is mandatory; only components
+# with a version are touched.
+#
+# Per-env logic (blue-green awareness):
+# - dev: development/ holds one Deployment per service (no colors) -- the
+#   specified image tags are replaced in place.
+# - staging/production: each service has blue + green Deployments. The live
+#   color is read from 53-live-services.yaml (the `<svc>-live` Service
+#   selectors) and only the IDLE Deployment image is bumped. Traffic is NOT
+#   flipped here -- flip the selectors afterwards, same as the promote flow.
+# =============================================================================
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      frontend_version:
+        description: "Frontend version (X.Y.Z or latest, empty = skip)"
+        required: false
+        default: ""
+      astrology_version:
+        description: "Astrology API version (X.Y.Z or latest, empty = skip)"
+        required: false
+        default: ""
+      booking_version:
+        description: "Booking API version (X.Y.Z or latest, empty = skip)"
+        required: false
+        default: ""
+      payment_version:
+        description: "Payment API version (X.Y.Z or latest, empty = skip)"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Require at least one version
+        run: |
+          if [ -z "${{ inputs.frontend_version }}" ] \
+            && [ -z "${{ inputs.astrology_version }}" ] \
+            && [ -z "${{ inputs.booking_version }}" ] \
+            && [ -z "${{ inputs.payment_version }}" ]; then
+            echo "At least one service version is required" >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Ensure PyYAML is available
+        run: |
+          python3 -c "import yaml" 2>/dev/null \
+            || pip install --break-system-packages pyyaml
+
+      - name: Bump Deployment image tags
+        env:
+          INPUT_ENV: ${{ inputs.environment }}
+          INPUT_FRONTEND_VERSION: ${{ inputs.frontend_version }}
+          INPUT_ASTROLOGY_VERSION: ${{ inputs.astrology_version }}
+          INPUT_BOOKING_VERSION: ${{ inputs.booking_version }}
+          INPUT_PAYMENT_VERSION: ${{ inputs.payment_version }}
+        run: |
+          python3 - <<'PYEOF'
+          import os
+          import re
+
+          import yaml
+
+          REGISTRY = "ghcr.io/astrolumina-by-carmen-ilie"
+          env_in = os.environ["INPUT_ENV"]
+          env_dir = {"development": "development", "staging": "staging",
+                     "production": "production"}[env_in]
+          # Service -> (deployment file base, GHCR image name).
+          services = {
+              "frontend": ("10-frontend-deployment", "astrolumina-frontend"),
+              "astrology-api": ("20-astrology-api-deployment",
+                                "astrolumina-astrologyapi"),
+              "booking-api": ("30-booking-api-deployment",
+                              "astrolumina-bookingapi"),
+              "payment-api": ("40-payment-api-deployment",
+                              "astrolumina-paymentapi"),
+          }
+          wanted = {
+              "frontend": os.environ.get("INPUT_FRONTEND_VERSION", "").strip(),
+              "astrology-api": os.environ.get("INPUT_ASTROLOGY_VERSION",
+                                              "").strip(),
+              "booking-api": os.environ.get("INPUT_BOOKING_VERSION",
+                                            "").strip(),
+              "payment-api": os.environ.get("INPUT_PAYMENT_VERSION",
+                                            "").strip(),
+          }
+          specified = {k: v for k, v in wanted.items() if v}
+          assert specified, "no version given (blocked by the validation step)"
+          shape = re.compile(r"^(\d+\.\d+\.\d+|latest)$")
+          for svc, ver in specified.items():
+              assert shape.match(ver), (
+                  f"bad version {ver!r} for {svc}: want X.Y.Z or latest")
+
+          def set_image(path, image, ver):
+              with open(path) as f:
+                  src = f.read()
+              pattern = f"^(\\s*image: {REGISTRY}/{image}:).*$"
+              new, n = re.subn(pattern, f"\\g<1>{ver}", src,
+                               count=1, flags=re.M)
+              assert n == 1, f"image line not found exactly once in {path}"
+              with open(path, "w") as f:
+                  f.write(new)
+
+          if env_in == "development":
+              for svc, ver in specified.items():
+                  base, image = services[svc]
+                  path = f"{env_dir}/{base}.yaml"
+                  set_image(path, image, ver)
+                  print(f"{svc}: image set to {ver}")
+          else:
+              with open(f"{env_dir}/53-live-services.yaml") as f:
+                  docs = [d for d in yaml.safe_load_all(f) if d]
+              live_of = {}
+              for doc in docs:
+                  if doc.get("kind") != "Service":
+                      continue
+                  name = doc["metadata"]["name"]
+                  assert name.endswith("-live"), f"unexpected Service {name!r}"
+                  live_of[name.removesuffix("-live")] = (
+                      doc["spec"]["selector"]["variant"])
+              for svc, ver in specified.items():
+                  live = live_of[svc]
+                  assert live in ("blue", "green"), (
+                      f"unexpected live color {live!r} for {svc}")
+                  idle = "green" if live == "blue" else "blue"
+                  base, image = services[svc]
+                  path = f"{env_dir}/{idle}/{base}.yaml"
+                  with open(path) as f:
+                      dep = yaml.safe_load(f)
+                  labels = dep["spec"]["template"]["metadata"]["labels"]
+                  assert labels.get("variant") == idle, (
+                      f"{path} carries variant {labels.get('variant')!r}, "
+                      f"refusing to touch the live color")
+                  set_image(path, image, ver)
+                  print(f"{svc}: live={live}, idle {idle} image set to {ver}")
+          PYEOF
+
+      - name: Commit to branch and open deploy PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="deploy/${{ inputs.environment }}-${{ github.run_number }}"
+          # The deploy/* namespace is bot-owned: -B resets a stale branch
+          # from an earlier failed run, and the force-push below only ever
+          # overwrites the bot's own previous attempt, never human work.
+          git checkout -B "$BRANCH"
+          # Fresh checkout plus the single python step above: -A can only
+          # stage the intended Deployment changes.
+          git add -A
+          echo "Changed files:"; git diff --cached --name-only
+          if git diff --cached --quiet; then
+            echo "Nothing to commit (images already at the requested tags)"
+          else
+            git commit -m "deploy ${{ inputs.environment }}: bump image tags"
+          fi
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then
+            echo "No changes vs main, skipping PR"
+          else
+            git push -u -f origin "$BRANCH"
+            if gh pr view "$BRANCH" --json number -q .number >/dev/null 2>&1; then
+              echo "PR already exists for $BRANCH, pushed update to it"
+            else
+              gh pr create --base main --head "$BRANCH" \
+                --title "deploy ${{ inputs.environment }}: bump image tags" \
+                --body "Manual deploy to ${{ inputs.environment }} (run ${{ github.run_number }}). Merge, then SYNC the ArgoCD app (or kubectl apply) and flip traffic when ready."
+            fi
+          fi
